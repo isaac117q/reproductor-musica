@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lavandería Express - Sistema de Atención al Cliente</title>
+    <style>
+        :root {
+            --primary: #0d6efd;
+            --primary-dark: #0b5ed7;
+            --success: #198754;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #6c757d;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --border: #dee2e6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: var(--info);
+            font-size: 0.9rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-areas:
+                "nav stats chart"
+                "main main main"
+                "footer footer footer";
+            gap: 20px;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto auto;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto auto auto auto;
+            }
+            .nav-area { grid-area: nav; }
+            .stats-area { grid-area: stats; }
+            .chart-area { grid-area: chart; }
+            .main-area { grid-area: main; }
+            .footer-area { grid-area: footer; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto auto auto auto auto;
+            }
+            .nav-area { grid-area: nav; }
+            .stats-area { grid-area: stats; }
+            .chart-area { grid-area: chart; }
+            .main-area { grid-area: main; }
+            .footer-area { grid-area: footer; }
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+        }
+
+        .card h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .card p {
+            color: var(--info);
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            text-decoration: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #157346;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-info {
+            background: var(--info);
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #545b62;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
+        }
+
+        .alert {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            color: #721f19;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .tab-btns button {
+            padding: 8px 16px;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            color: #666;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-right: 5px;
+            transition: all 0.2s;
+        }
+
+        .tab-btns button.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .tab-btns button:hover:not(.active) {
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #e2e6ea;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .status-online {
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .status-offline {
+            color: var(--danger);
+            font-weight: bold;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .ticket-section {
+            min-height: 300px;
+        }
+
+        .ticket {
+            border: 2px solid var(--primary);
+            padding: 20px;
+            margin-top: 10px;
+        }
+
+        .ticket h3 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .ticket-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10x;
+            font-size: 0.9rem;
+        }
+
+        .ticket-row span:first-child {
+            width: 40%;
+        }
+
+        .ticket-total {
+            border-top: 1px solid var(--primary);
+            padding-top: 15px;
+            margin-top: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-align: right;
+        }
+
+        .nav-link {
+            color: #444;
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-right: 5px;
+            transition: background 0.2s;
+        }
+
+        .nav-link.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .nav-link:hover:not(.active) {
+            background: #f5f5f5;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-number {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 5px 0;
+        }
+
+        .stat-label {
+            color: var(--info);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Lavandería Express</h1>
+            <p>Sistema de Atención al Cliente - Dashboard</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Navigation -->
+            <div class="nav-area card" style="grid-area: nav;">
+                <h3>Menú Principal</h3>
+                <div class="tab-btns">
+                    <button class="tab-btn active" onclick="showSection('dashboard')">Dashboard</button>
+                    <button class="tab-btn" onclick="showSection('clientes')">Clientes</button>
+                    <button class="tab-btn" onclick="showSection('servicios')">Servicios</button>
+                    <button class="tab-btn" onclick="showSection('config')">Configuración</button>
+                    <button class="tab-btn" onclick="showSection('ticket')">Ticket</button>
+                </div>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="stats-area card" style="grid-area: stats;">
+                <h3>Resumen Rápido</h3>
+                <div class="row" id="stat-cards">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+
+            <!-- Chart Area -->
+            <div class="chart-area card" style="grid-area: chart;">
+                <h3>Distribución por Tipo de Servicio</h3>
+                <canvas id="serviciosChart"></canvas>
+            </div>
+
+            <!-- Main Area -->
+            <div class="main-area card" style="grid-area: main;">
+                <h3>Información Detallada</h3>
+                <p>Seleccione una opción del menú lateral para ver detalles.</p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer-area card" style="grid-area: footer;">
+                <hr style="margin: 15px 0;">
+                <p style="font-size: 0.8rem; color: var(--info);">
+                    Lavandería Express v2.0 | Datos guardados localmente
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboard-section" style="display: none;">
+        <h2>Dashboard Principal</h2>
+        <div class="row" id="dashboard-stats">
+            <!-- Cards generadas por JS -->
+        </div>
+        <canvas id="dashboard-chart"></canvas>
+    </div>
+
+    <!-- Client Section -->
+    <div id="clientes-section" style="display: none;">
+        <h2>Registrar Nuevo Cliente</h2>
+        <div class="card">
+            <form id="form-cliente">
+                <div class="form-group">
+                    <label>Nombre completo *</label>
+                    <input type="text" id="nombre-cliente" required>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" id="telefono-cliente">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email-cliente">
+                </div>
+                <button type="submit" class="btn btn-primary">Registrar Cliente</button>
+            </form>
+        </div>
+
+        <h3>Lista de Clientes</h3>
+        <div id="lista-clientes"></div>
+    </div>
+
+    <!-- Services Section -->
+    <div id="servicios-section" style="display: none;">
+        <h2>Registrar Nuevo Servicio</h2>
+        <div class="card">
+            <form id="form-servicio">
+                <input type="hidden" id="cliente-id-serv">
+                <div class="form-group">
+                    <label>Cliente</label>
+                    <select id="cliente-select">
+                        <option value="">Seleccione un cliente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Servicio *</label>
+                    <input type="text" id="tipo-servicio" placeholder="Ej. Lavado, Secado, Planchado">
+                </div>
+                <div class="form-group">
+                    <label>Precio *</label>
+                    <input type="number" id="precio-servicio" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Peso (kg)</label>
+                    <input type="number" id="peso-servicio" min="0" step="0.5">
+                </div>
+                <button type="submit" class="btn btn-success">Registrar Servicio</button>
+            </form>
+        </div>
+
+        <h3>Historial de Servicios</h3>
+        <div id="historial-servicios">
+            <p>Cargando historial...</p>
+        </div>
+    </div>
+
+    <!-- Config Section -->
+    <div id="config-section" style="display: none;">
+        <h2>Configuración</h2>
+        <div class="card">
+            <h3>Nombre de la Lavandería</h3>
+            <div class="form-group">
+                <label>Nombre actual</label>
+                <span id="nombre-actual"></span>
+                <input type="text" id="nombre-lavanderia" readonly>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Precios por Servicio</h3>
+            <div id="precios-servicios">
+                <!-- Dinámico -->
+            </div>
+        </div>
+
+        <button class="btn btn-warning" onclick="agregarNuevoServicio()">Añadir Nuevo Servicio con Precio</button>
+    </div>
+
+    <!-- Ticket Section -->
+    <div id="ticket-section" style="display: none;">
+        <h2>Impresión de Ticket</h2>
+        <div class="card">
+            <form id="form-ticket">
+                <div class="form-group">
+                    <label>Nombre del Cliente *</label>
+                    <input type="text" id="nombre-ticket" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Generar Ticket</button>
+            </form>
+        </div>
+
+        <div id="ticket-resultado"></div>
+    </div>
+
+    <script>
+        // Datos persistentes en localStorage
+        const DATA_KEY = 'lavanderia_data';
+        
+        function obtenerDatos() {
+            const datos = localStorage.getItem(DATA_KEY);
+            return datos ? JSON.parse(datos) : {
+                clientes: [],
+                servicios: [],
+                config: {
+                    nombre: 'Lavandería Express',
+                    precios: {
+                        'lavado': 15.00,
+                        'secado': 10.00,
+                        'planchado': 20.00
+                    }
+                }
+            };
+        }
+        
+        function guardarDatos(datos) {
+            localStorage.setItem(DATA_KEY, JSON.stringify(datos));
+        }
+        
+        // Cargar datos iniciales
+        let datos = obtenerDatos();
+        
+        // Elementos del DOM
+        const statCards = document.getElementById('stat-cards');
+        const listaClientes = document.getElementById('lista-clientes');
+        const histServicios = document.getElementById('historial-servicios');
+        const preciosServicios = document.getElementById('precios-servicios');
+        const nombreActual = document.getElementById('nombre-actual');
+        const nombreTicket = document.getElementById('nombre-ticket');
+        const ticketResultado = document.getElementById('ticket-resultado');
+        
+        // Inicializar
+        function inicializar() {
+            renderizarEstadisticas();
+            renderizarClientes();
+            renderizarPrecios();
+            renderizarHistorial();
+            if (document.getElementById('serviciosChart')) {
+                inicializarGrafico();
+            }
+        }
+        
+        // Sección actual
+        let seccionActual = 'dashboard';
+        
+        function showSection(seccion) {
+            seccionActual = seccion;
+            
+            // Ocultar todas las secciones
+            document.getElementById('dashboard-section').style.display = 'none';
+            document.getElementById('clientes-section').style.display = 'none';
+            document.getElementById('servicios-section').style.display = 'none';
+            document.getElementById('config-section').style.display = 'none';
+            document.getElementById('ticket-section').style.display = 'none';
+            
+            // Mostrar la seleccionada
+            document.getElementById(seccion + '-section').style.display = 'block';
+            
+            // Actualizar botones activos
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Renderizar según sección
+            if (seccion === 'dashboard') {
+                renderizarDashboard();
+            } else if (seccion === 'clientes') {
+                renderizarClientes();
+            } else if (seccion === 'servicios') {
+                renderizarServicios();
+                renderizarHistorial();
+            } else if (seccion === 'config') {
+                renderizarConfig();
+            } else if (seccion === 'ticket') {
+                // Limpiar ticket
+                ticketResultado.innerHTML = '';
+            }
+        }
+        
+        // Renderizar Dashboard
+        function renderizarDashboard() {
+            const totalClientes = datos.clientes.length;
+            const totalServicios = datos.servicios.length;
+            const ingresoTotal = datos.servicios.reduce((sum, s) => sum + s.precio, 0);
+            const pesoTotal = datos.servicios.reduce((sum, s) => sum + (s.peso || 0), 0);
+            
+            // Mes actual
+            const hoy = new Date();
+            const mesActual = datos.servicios.filter(s => {
+                const fecha = new Date(s.fecha);
+                return fecha.getMonth() === hoy.getMonth() && fecha.getFullYear() === hoy.getFullYear();
+            });
+            
+            const serviciosMes = mesActual.length;
+            const ingresoMes = mesActual.reduce((sum, s) => sum + s.precio, 0);
+            const pesoMes = mesActual.reduce((sum, s) => sum + (s.peso || 0), 0);
+            
+            // Cards de estadísticas
+            statCards.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${totalClientes}</div>
+                    <div class="stat-label">Clientes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${totalServicios}</div>
+                    <div class="stat-label">Servicios</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$${ingresoTotal.toFixed(2)}</div>
+                    <div class="stat-label">Ingresos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${pesoTotal} kg</div>
+                    <div class="stat-label">Peso Total</div>
+                </div>
+            `;
+            
+            // Gráfico de pastel
+            const ctx = document.getElementById('dashboard-chart').getContext('2d');
+            
+            // Calcular por tipo
+            const porTipo = {};
+            datos.servicios.forEach(s => {
+                porTipo[s.tipo] = (porTipo[s.tipo] || 0) + s.precio;
+            });
+            
+            const labels = Object.keys(porTipo);
+            const data = Object.values(porTipo);
+            const colores = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d', '#28a745'];
+            
+            if (dashboardChart) {
+                dashboardChart.destroy();
+            }
+            
+            dashboardChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: labels.map((_, i) => colores[i % colores.length])
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: $${context.parsed[0].toFixed(2)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Actualizar título
+            document.getElementById('dashboard-stats').innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <h4>Mes Actual: ${hoy.toLocaleDateString('es-MX', { month: 'long' })} ${hoy.getFullYear()}</h4>
+                    <p>Servicios este mes: ${serviciosMes} | Ingresos: $${ingresoMes.toFixed(2)} | Peso: ${pesoMes} kg</p>
+                </div>
+            `;
+        }
+        
+        // Renderizar Clientes
+        function renderizarClientes() {
+            if (datos.clientes.length === 0) {
+                listaClientes.innerHTML = '<p>No hay clientes registrados</p>';
+                return;
+            }
+            
+            listaClientes.innerHTML = `
+                <table class="table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; border: 1px solid var(--border);">ID</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Nombre</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Teléfono</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Servicios</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${datos.clientes.map((c, i) => {
+                            const serviciosCliente = datos.servicios.filter(s => s.cliente_id === c.id);
+                            return `
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${c.id}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${c.nombre}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${c.telefono || 'N/A'}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${serviciosCliente.length}</td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        // Renderizar Servicios
+        function renderizarServicios() {
+            if (datos.servicios.length === 0) {
+                histServicios.innerHTML = '<p>No hay servicios registrados</p>';
+                return;
+            }
+            
+            histServicios.innerHTML = `
+                <table class="table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; border: 1px solid var(--border);">#</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Cliente</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Servicio</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Precio</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Peso</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${datos.servicios.map((s, i) => {
+                            const cliente = datos.clientes.find(c => c.id === s.cliente_id);
+                            const fecha = new Date(s.fecha).toLocaleDateString('es-MX');
+                            return `
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${i + 1}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${cliente ? cliente.nombre : 'Desconocido'}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${s.tipo}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">$${s.precio.toFixed(2)}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${s.peso || 0} kg</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${fecha}</td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        // Renderizar Historial
+        function renderizarHistorial() {
+            if (datos.servicios.length === 0) {
+                histServicios.innerHTML = '<p>No hay servicios registrados</p>';
+                return;
+            }
+            
+            // Filtrar por mes actual
+            const hoy = new Date();
+            const serviciosMes = datos.servicios.filter(s => {
+                const fecha = new Date(s.fecha);
+                return fecha.getMonth() === hoy.getMonth() && fecha.getFullYear() === hoy.getFullYear();
+            });
+            
+            histServicios.innerHTML = `
+                <h4>Servicios del Mes Actual</h4>
+                <p>Total: ${serviciosMes.length} servicios | Ingresos: $${serviciosMes.reduce((s, a) => s + a.precio, 0).toFixed(2)}</p>
+                <table class="table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; border: 1px solid var(--border);">#</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Cliente</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Servicio</th>
+                            <th style="padding: 10px; border: 1px solid var(--border);">Precio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${serviciosMes.slice(0, 10).map((s, i) => {
+                            const cliente = datos.clientes.find(c => c.id === s.cliente_id);
+                            return `
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${i + 1}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${cliente ? cliente.nombre : 'Desconocido'}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">${s.tipo}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border);">$${s.precio.toFixed(2)}</td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        // Renderizar Configuración
+        function renderizarConfig() {
+            nombreActual.textContent = datos.config.nombre;
+            nombreLavanderia.value = datos.config.nombre;
+            
+            preciosServicios.innerHTML = `
+                <h5>Precios Configurados</h5>
+                ${Object.entries(datos.config.precios).map(([tipo, precio]) => `
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</label>
+                        <input type="number" step="0.01" min="0" value="${precio}" data-tipo="${tipo}" class="precio-input">
+                    </div>
+                `).join('')}
+            `;
+            
+            // Agregar evento a los inputs de precio
+            document.querySelectorAll('.precio-input').forEach(input => {
+                input.addEventListener('change', function() {
+                    const tipo = this.getAttribute('data-tipo');
+                    const valor = parseFloat(this.value);
+                    if (!isNaN(valor) && valor >= 0) {
+                        datos.config.precios[tipo] = valor;
+                        guardarDatos(datos);
+                        renderizarConfig();
+                        showToast('Precio actualizado', 'success');
+                    }
+                });
+            });
+        }
+        
+        // Agregar nuevo servicio
+        function agregarNuevoServicio() {
+            const tipos = Object.keys(datos.config.precios);
+            if (tipos.length === 0) {
+                showToast('No hay tipos de servicio configurados', 'danger');
+                return;
+            }
+            
+            const tipo = prompt('Ingrese tipo de servicio:', 'Nuevo Servicio');
+            if (!tipo) return;
+            
+            const precio = prompt(`Ingrese precio para ${tipo} (actual: $${datos.config.precios[tipo] || 0}):`);
+            if (precio === null) return;
+            
+            const precioNum = parseFloat(precio);
+            if (isNaN(precioNum) || precioNum < 0) {
+                showToast('Precio inválido', 'danger');
+                return;
+            }
+            
+            // Agregar nuevo tipo si no existe
+            if (!datos.config.precios[tipo]) {
+                datos.config.precios[tipo] = precioNum;
+            } else {
+                datos.config.precios[tipo] = precioNum;
+            }
+            
+            guardarDatos(datos);
+            renderizarConfig();
+            showToast('Servicio agregado/actualizado', 'success');
+        }
+        
+        // Formulario: Registrar Cliente
+        document.getElementById('form-cliente').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('nombre-cliente').value.trim();
+            if (!nombre) {
+                showToast('Nombre requerido', 'danger');
+                return;
+            }
+            
+            const nuevoCliente = {
+                id: Date.now(),
+                nombre: nombre,
+                telefono: document.getElementById('telefono-cliente').value.trim(),
+                email: document.getElementById('email-cliente').value.trim(),
+                fecha: new Date().toISOString()
+            };
+            
+            datos.clientes.push(nuevoCliente);
+            guardarDatos(datos);
+            
+            showToast('Cliente registrado exitosamente', 'success');
+            renderizarClientes();
+            renderizarServicios();
+            this.reset();
+        });
+        
+        // Formulario: Registrar Servicio
+        document.getElementById('form-servicio').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const clienteId = document.getElementById('cliente-id-serv').value;
+            const tipo = document.getElementById('tipo-servicio').value.trim();
+            const precio = parseFloat(document.getElementById('precio-servicio').value);
+            const peso = parseFloat(document.getElementById('peso-servicio').value) || 0;
+            
+            if (!clienteId || !tipo || isNaN(precio) || precio < 0) {
+                showToast('Complete todos los campos requeridos', 'danger');
+                return;
+            }
+            
+            // Verificar si el cliente existe, si no, crear uno nuevo
+            let cliente = datos.clientes.find(c => c.id === parseInt(clienteId));
+            if (!cliente) {
+                cliente = {
+                    id: parseInt(clienteId),
+                    nombre: document.getElementById('cliente-select').options[document.getElementById('cliente-select').selectedIndex].text,
+                    telefono: '',
+                    email: ''
+                };
+                datos.clientes.push(cliente);
+            }
+            
+            const nuevoServicio = {
+                id: Date.now(),
+                cliente_id: parseInt(clienteId),
+                tipo: tipo,
+                precio: precio,
+                peso: peso,
+                fecha: new Date().toISOString()
+            };
+            
+            datos.servicios.push(nuevoServicio);
+            guardarDatos(datos);
+            
+            showToast('Servicio registrado exitosamente', 'success');
+            renderizarServicios();
+            renderizarHistorial();
+            renderizarClientes();
+            this.reset();
+            document.getElementById('cliente-id-serv').value = '';
+            document.getElementById('tipo-servicio').value = '';
+            document.getElementById('precio-servicio').value = '';
+            document.getElementById('peso-servicio').value = '';
+        });
+        
+        // Formulario: Ticket
+        document.getElementById('form-ticket').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const nombre = document.getElementById('nombre-ticket').value.trim();
+            if (!nombre) {
+                showToast('Nombre requerido', 'danger');
+                return;
+            }
+            
+            // Buscar último servicio de este cliente
+            const clienteServicios = datos.servicios.filter(s => {
+                const cliente = datos.clientes.find(c => c.id === s.cliente_id);
+                return cliente && c.nombre === nombre;
+            });
+            
+            if (clienteServicios.length === 0) {
+                showToast('No se encontraron servicios para este cliente', 'warning');
+                return;
+            }
+            
+            const ultimoServicio = clienteServicios[clienteServicios.length - 1];
+            const cliente = datos.clientes.find(c => c.id === ultimoServicio.cliente_id);
+            
+            // Generar ticket HTML
+            ticketResultado.innerHTML = `
+                <div class="ticket">
+                    <h3>TICKET - ${datos.config.nombre}</h3>
+                    <div class="ticket-row">
+                        <span>Fecha: ${new Date().toLocaleDateString('es-MX')}</span>
+                        <span>Hora: ${new Date().toLocaleTimeString('es-MX')}</span>
+                    </div>
+                    <div class="ticket-row">
+                        <span>Cliente: ${cliente ? cliente.nombre : 'N/A'}</span>
+                        <span>Tel: ${cliente ? cliente.telefono : 'N/A'}</span>
+                    </div>
+                    <div class="ticket-row">
+                        <span>Servicio: ${ultimoServicio.tipo}</span>
+                        <span>Peso: ${ultimoServicio.peso || 0} kg</span>
+                    </div>
+                    <div class="ticket-row">
+                        <span>Precio: $${ultimoServicio.precio.toFixed(2)}</span>
+                    </div>
+                    <div class="ticket-total">
+                        <span>TOTAL: $${ultimoServicio.precio.toFixed(2)}</span>
+                    </div>
+                    <div style="margin-top: 20px; text-align: center; font-size: 0.8rem; color: var(--info);">
+                        ¡Gracias por su visita!
+                    </div>
+                </div>
+            `;
+            
+            showToast('Ticket generado', 'success');
+        });
+        
+        // Helper: Mostrar toast
+        function showToast(mensaje, tipo = 'info') {
+            // Remover toasts previos
+            const existentes = document.querySelectorAll('.toast');
+            existentes.forEach(t => t.remove());
+            
+            const toast = document.createElement('div');
+            toast.className = `toast alert-${tipo} toast-show`;
+            toast.innerHTML = `
+                <span>${mensaje}</span>
+                <button class="btn-close" onclick="this.parentElement.remove()">&times;</button>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.style.transition = 'opacity 0.5s';
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 500);
+                }
+            }, 3000);
+        }
+        
+        // Actualizar precio de servicio al cambiar cliente
+        function updateServicioPrecio() {
+            const select = document.getElementById('cliente-select');
+            const idx = select.selectedIndex;
+            const cliente = datos.clientes[idx - 1]; // -1 por el option vacío
+            if (cliente) {
+                document.getElementById('precio-servicio').value = datos.config.precios['lavado'] || 15;
+            }
+        }
+        
+        // Inicializar gráfico
+        let dashboardChart;
+        
+        function inicializarGrafico() {
+            const canvas = document.getElementById('serviciosChart');
+            if (!canvas.getContext) return;
+            
+            ctx = canvas.getContext('2d');
+            
+            // Datos por tipo
+            const porTipo = {};
+            datos.servicios.forEach(s => {
+                porTipo[s.tipo] = (porTipo[s.tipo] || 0) + 1;
+            });
+            
+            const labels = Object.keys(porTipo);
+            const data = Object.values(porTipo);
+            const colores = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d', '#28a745'];
+            
+            const serviciosChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Cantidad de Servicios',
+                        data: data,
+                        backgroundColor: labels.map((_, i) => colores[i % colores.length]),
+                        borderColor: labels.map((_, i) => colores[i % colores.length]),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.parsed.y} servicios`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Inicializar todo al cargar
+        document.addEventListener('DOMContentLoaded', inicializar);
+        
+        // Event listeners para el select de clientes
+        document.addEventListener('change', '#cliente-select', function() {
+            const idx = this.selectedIndex;
+            if (idx > 0) {
+                const cliente = datos.clientes[idx - 1];
+                document.getElementById('cliente-id-serv').value = cliente.id;
+                document.getElementById('precio-servicio').value = datos.config.precios['lavado'] || 15;
+            }
+        });
+        
+        // Mostrar sección por defecto
+        showSection('dashboard');
+    </script>
+</body>
+</html>

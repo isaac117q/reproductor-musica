@@ -1,0 +1,58 @@
+{
+  "name": "reproductor-musica",
+  "version": "1.9.6",
+  "description": "Reproductor de música para Windows",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "author": "Isaac",
+  "license": "MIT",
+  "allowScripts": {
+    "electron@33.4.11": true
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.isaac.reproductor",
+    "productName": "Reproductor de Música",
+    "publish": {
+      "provider": "github",
+      "owner": "isaac117q",
+      "repo": "reproductor-musica"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "icon.ico"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ReproductorMusica-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Reproductor de Música",
+      "uninstallDisplayName": "Reproductor de Música ${version}",
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}

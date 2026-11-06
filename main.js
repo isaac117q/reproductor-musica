@@ -1,0 +1,596 @@
+const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
+const fsp = fs.promises;
+
+let mainWindow = null;
+
+// Carpeta de datos alternativa SOLO para pruebas aisladas:
+//   electron . --userdata="C:\ruta\temporal"
+// Se usa antes de app.whenReady(), así no se toca la lista ni los ajustes reales.
+const udArg = process.argv.find(a => /^--userdata=/.test(a));
+if (udArg) {
+  const dir = udArg.slice('--userdata='.length).replace(/^"|"$/g, '');
+  if (dir) { try { fs.mkdirSync(dir, { recursive: true }); app.setPath('userData', dir); } catch (e) {} }
+}
+
+// ====== Prueba automática de sincronización de letras (electron . --selftest) ====== */
+const SELFTEST_CODE = `
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const out = { steps: [], errs: [] };
+  window.addEventListener('error', e => out.errs.push(String(e.message)));
+  const media = document.getElementById('media');
+  const active = () => (document.querySelector('.ly.on') || {}).textContent || null;
+  const headTxt = () => (document.querySelector('.ly.head') || {}).textContent || null;
+  const lineCount = () => document.querySelectorAll('.ly[data-t]').length;
+  const snap = (tag) => ({
+    tag: tag,
+    title: document.getElementById('title').textContent,
+    rows: document.querySelectorAll('.row').length,
+    count: document.getElementById('count').textContent,
+    dur: isFinite(media.duration) ? media.duration : String(media.duration),
+    src: (media.currentSrc || media.src || '').slice(0, 24),
+    toast: document.getElementById('toast').textContent
+  });
+
+  try {
+    // 1) Sembrar la caché con una LETRA SIMPLE (ruta sin tiempos reales)
+    if (window.playerAPI && playerAPI.saveCachedLyrics) {
+      await playerAPI.saveCachedLyrics('pruebademo-cancion-plain', {
+        type: 'plain',
+        text: ['linea uno de la cancion','linea dos aqui','linea tres aqui','linea cuatro aqui',
+               'linea cinco aqui','linea seis aqui','linea siete aqui','linea ocho aqui',
+               'linea nueve aqui','linea diez aqui'].join(String.fromCharCode(10))
+      });
+      out.steps.push('caché sembrada');
+    }
+
+    // 2) WAV sintético de 207 segundos (duración real de "Levitating")
+    const sr = 8000, n = sr * 207, data = new Uint8Array(n);
+    for (let i = 0; i < n; i++) data[i] = Math.round(127 + 100 * Math.sin(2 * Math.PI * 440 * i / sr));
+    const buf = new ArrayBuffer(44 + n), dv = new DataView(buf);
+    const ws = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+    ws(0,'RIFF'); dv.setUint32(4,36+n,true); ws(8,'WAVE'); ws(12,'fmt ');
+    dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
+    dv.setUint32(24,sr,true); dv.setUint32(28,sr,true); dv.setUint16(32,1,true); dv.setUint16(34,8,true);
+    ws(36,'data'); dv.setUint32(40,n,true);
+
+    const dt = new DataTransfer();
+    dt.items.add(new File([buf], 'Dua Lipa - Levitating.wav', {type:'audio/wav'}));
+    dt.items.add(new File([buf], 'Pruebademo - Cancion Plain.wav', {type:'audio/wav'}));
+    out.filesSoltados = dt.items.length;
+    window.dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true}));
+    out.afterDrop = snap('inmediato');
+    out.steps.push('2 archivos soltados');
+
+    // 3) Pista 0: letra sincronizada descargada de internet
+    await sleep(4000); out.t4 = snap('4s');
+    await sleep(8000);
+    out.online = Object.assign(snap('12s'), {
+      lines: lineCount(),
+      head: headTxt()
+    });
+    media.currentTime = 25;
+    await sleep(1000);
+    out.online.active25 = active();
+
+    // 3b) REPRODUCCIÓN REAL: la canción suene y la letra debe avanzar sola
+    const samples = [];
+    try { await media.play(); } catch (e) { out.playErr = String(e); }
+    for (let s = 0; s < 4; s++) {
+      await sleep(3000);
+      samples.push({
+        wall: (s + 1) * 3,
+        time: +media.currentTime.toFixed(2),
+        paused: media.paused,
+        active: active()
+      });
+    }
+    media.pause();
+    out.playback = {
+      samples: samples,
+      timeAdvanced: samples.length > 1 && samples[samples.length - 1].time > samples[0].time,
+      lyricAdvanced: new Set(samples.map(x => x.active)).size > 1
+    };
+
+    // 4) Pista 1: letra simple desde caché + avance estimado
+    const rows = document.querySelectorAll('.row');
+    out.rowsNow = rows.length;
+    if (rows[1]) { rows[1].click(); await sleep(2500); }
+    out.plain = { head: headTxt(), lines: lineCount(), snap: snap('pista2') };
+    media.currentTime = 12;
+    await sleep(1000);
+    out.plain.active12 = active();
+    out.plain.duration = isFinite(media.duration) ? media.duration : String(media.duration);
+    out.plain.times = [...document.querySelectorAll('.ly[data-t]')].slice(0, 5).map(e => e.dataset.t);
+    out.removed = window.__removed || 0;
+    out.removedStack = window.__removedStack || null;
+  } catch (e) {
+    out.error = String(e && (e.stack || e.message) || e);
+  }
+  return out;
+})()
+`;
+
+// ====== Prueba con un archivo REAL del usuario (electron . --filetest) ====== */
+const REALFILETEST_CODE = `
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const out = { steps: [], errs: [] };
+  window.addEventListener('error', e => out.errs.push(String(e.message)));
+  const media = document.getElementById('media');
+  const active = () => (document.querySelector('.ly.on') || {}).textContent || null;
+  const headTxt = () => (document.querySelector('.ly.head') || {}).textContent || null;
+  const lineCount = () => document.querySelectorAll('.ly[data-t]').length;
+
+  try {
+    // Decodificar el archivo real (base64 inyectado desde el proceso principal)
+    const b64 = __B64__;
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const name = __NAME__;
+    const file = new File([bytes], name, { type: 'audio/mpeg' });
+    out.file = { name: name, mb: +(bytes.length / 1048576).toFixed(1) };
+
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    out.steps.push('archivo real soltado');
+
+    // Esperar a que cargue metadata y la letra
+    await sleep(9000);
+    const lineEls = [...document.querySelectorAll('.ly[data-t]')];
+    out.carga = {
+      title: document.getElementById('title').textContent,
+      artist: document.getElementById('artist').textContent,
+      dur: isFinite(media.duration) ? +media.duration.toFixed(1) : String(media.duration),
+      lines: lineEls.length,
+      head: headTxt(),
+      statico: lineEls.length === 0,        // letra SIN tiempos → nunca resaltará
+      primeraLinea: lineEls.length ? +lineEls[0].dataset.t : null
+    };
+
+    // REPRODUCIR desde donde empiezan las letras y vigilar si avanza sola
+    try { await media.play(); } catch (e) { out.playErr = String(e); }
+    if (out.carga.primeraLinea != null) media.currentTime = Math.max(0, out.carga.primeraLinea - 1);
+    const samples = [];
+    for (let s = 0; s < 5; s++) {
+      await sleep(3000);
+      samples.push({
+        t: +media.currentTime.toFixed(1),
+        paused: media.paused,
+        active: active()
+      });
+    }
+    media.pause();
+    out.samples = samples;
+    out.sincroniza = {
+      tiempoAvanza: samples[samples.length - 1].t > samples[0].t,
+      letraCambia: new Set(samples.map(x => x.active)).size > 1
+    };
+  } catch (e) {
+    out.error = String(e && (e.stack || e.message) || e);
+  }
+  return out;
+})()
+`;
+
+// ====== Letras sin internet: caché local + archivos .lrc ====== */
+function lyricCacheFile(key) {
+  const safe = String(key || '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+  if (!safe) return null;
+  return path.join(app.getPath('userData'), 'lyrics', safe + '.json');
+}
+
+// Leer letra guardada previamente (funciona sin internet)
+ipcMain.handle('lyrics-cache-get', async (_e, key) => {
+  try {
+    const f = lyricCacheFile(key);
+    if (!f) return null;
+    const raw = await fsp.readFile(f, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+});
+
+// Guardar letra descargada para usarla luego sin internet
+ipcMain.handle('lyrics-cache-set', async (_e, key, data) => {
+  try {
+    const f = lyricCacheFile(key);
+    if (!f) return false;
+    await fsp.mkdir(path.dirname(f), { recursive: true });
+    await fsp.writeFile(f, JSON.stringify(data), 'utf8');
+    return true;
+  } catch (e) { return false; }
+});
+
+// Leer archivo .lrc (con tiempos) o .txt (letra simple) junto a la canción
+ipcMain.handle('read-lrc', async (_e, p) => {
+  try {
+    if (!p || !/\.(lrc|txt)$/i.test(p)) return null;
+    const real = await fsp.realpath(p).catch(() => p);
+    const txt = await fsp.readFile(real, 'utf8');
+    return String(txt).replace(/^\uFEFF/, '');
+  } catch (e) { return null; }
+});
+
+
+function decodeHtml(s) {
+  return String(s || '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+}
+
+// Descargar letra desde letras.com (página original o traducción) — automático, sin botones
+ipcMain.handle('fetch-letras', async (_e, payload) => {
+  const p = (payload && typeof payload === 'object') ? payload : { url: payload };
+  let urls = [];
+  if (p.url) urls = [p.url];
+  if (!urls.length && p.artist && p.title) {
+    const slug = (s) => String(s || '').toLowerCase()
+      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const JUNK = /traduc|official|oficial|v\u00eddeo|video|videoclip|letra|lyrics?|lyric|audio|visuali[sz]er|live|directo|en\s+vivo|primera\s+fila|hd|4k|remaster(?:ed)?|original\s+version|versi\u00f3n\s+original|version\s+original|karaoke|cover|sub\s*espa\u00f1ol|subtitulad[oa]s?/i;
+    const clean = (s) => String(s || '')
+      .replace(/\[[^\]]*\]/g, ' ').replace(/\(([^)]*)\)/g, (m, im) => JUNK.test(im) ? ' ' : m)
+      .replace(/\s*[|]\s*/g, ' ')
+      .replace(/\s{2,}/g, ' ').trim();
+    const sinFt = (s) => s.replace(/\s+(?:ft\.?|feat\.?|featuring|with)\s+.*$/i, '').trim();
+    const base = sinFt(clean(p.title)) || clean(p.title);
+    // Variante totalmente limpia: sin paréntesis ni palabras de video. letras.com
+    // no tiene páginas como «…-original-version» ni «…-letra»: sin esto, canciones
+    // en español con nombres largos nunca encontraban su página.
+    const limpio = sinFt(String(base)
+      .replace(/\([^)]*\)/g, ' ').replace(/\[[^\]]*\]/g, ' ')
+      .replace(new RegExp('\\b(?:' + JUNK.source + ')\\b.*$', 'gi'), ' ')
+      .replace(/\s{2,}/g, ' ').trim()) || base;
+    const art = slug(clean(p.artist));
+    const vistos = new Set();
+    for (const b of [limpio, base]) {
+      const u = 'https://www.letras.com/' + art + '/' + slug(b) + '/';
+      if (!vistos.has(u)) { vistos.add(u); urls.push(u); }
+    }
+  }
+  if (!urls.length) return { ok: false, error: 'sin url' };
+  for (const url of urls) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+          'Referer': 'https://www.letras.com/'
+        }
+      });
+      clearTimeout(timer);
+      if (!res.ok) {
+        if (res.status === 403 || res.status >= 500) return { ok: false, error: 'HTTP ' + res.status, net: true };
+        continue;   // 404: probar la siguiente variante de URL
+      }
+      const html = await res.text();
+      const reVerse = new RegExp('<span[^>]*class\\s*=\\s*"verse"[^>]*>\\s*<span[^>]*>([\\s\\S]*?)</span>', 'gi');
+      const reChorus = new RegExp(reVerse.source.replace('verse', 'chorus'), 'gi');
+      let verses = [...html.matchAll(reVerse), ...html.matchAll(reChorus)];
+      if (verses.length) {
+        const lines = verses.map(m => decodeHtml(m[1])).map(s => s.trim()).filter(Boolean);
+        if (lines.length) return { ok: true, text: lines.join('\n'), source: 'letras.com' };
+      }
+      const idx = html.indexOf('js-lyric-content');
+      const chunk = idx >= 0 ? html.slice(idx, idx + 30000) : html;
+      const pm = chunk.match(new RegExp('<p[^>]*>([\\s\\S]*?)</p>'));
+      if (pm) {
+        const raw = pm[1].replace(new RegExp('<br\\s*/?>', 'gi'), '\n').replace(/<[^>]+>/g, '').trim();
+        const text = decodeHtml(raw);
+        if (text) return { ok: true, text, source: 'letras.com' };
+      }
+    } catch (e) {
+      clearTimeout(timer);
+      const net = !!(e && /abort|fetch|network/i.test(String(e && e.message || e)));
+      if (net) return { ok: false, error: String(e && e.message || e), net: true };
+      // otro error: probar la siguiente variante
+    }
+  }
+  return { ok: false, error: 'no se encontró la letra' };
+});
+
+// Guardar una letra descargada como archivo .lrc junto a la canción (para usarla sin internet)
+// Leer el audio de la pista para analizar la voz en el renderizador (Web Audio).
+// Solo se usa en la pista actual y con un tope de tamaño: nunca bloquea la interfaz.
+const AUDIO_MAX_BYTES = 64 * 1024 * 1024;
+ipcMain.handle('read-audio', async (_e, p) => {
+  try {
+    const file = String(p || '');
+    if (!file || !/\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|webm|mp4|m4v|mkv|mov)$/i.test(file)) return null;
+    const real = await fsp.realpath(file).catch(() => file);
+    const st = await fsp.stat(real);
+    if (!st.isFile() || st.size > AUDIO_MAX_BYTES) return null;
+    return await fsp.readFile(real);
+  } catch (e) { return null; }
+});
+
+ipcMain.handle('save-lrc', async (_e, p, text) => {
+  try {
+    if (!p || !text) return false;
+    const base = String(p).replace(/\.[^.]+$/, '');
+    const lrcPath = base + '.lrc';
+    await fsp.writeFile(lrcPath, String(text), 'utf8');
+    await appendDebug('letra guardada en ' + lrcPath);
+    return true;
+  } catch (e) {
+    await appendDebug('ERROR save-lrc: ' + (e && e.message || e));
+    return false;
+  }
+});
+
+// ====== Lista de reproducción persistente (sobrevive al cerrar la app) ====== */
+const playlistFile = () => path.join(app.getPath('userData'), 'playlist.json');
+
+// Registro de diagnóstico reutilizable (máx ~200 KB)
+async function appendDebug(line) {
+  try {
+    const f = path.join(app.getPath('userData'), 'debug.log');
+    try {
+      const st = await fsp.stat(f);
+      if (st.size > 200000) await fsp.unlink(f).catch(() => {});
+    } catch (e) { /* aún no existe */ }
+    await fsp.appendFile(f, String(line).slice(0, 500) + '\n', 'utf8');
+  } catch (e) { /* sin registro */ }
+}
+
+ipcMain.handle('playlist-get', async () => {
+  try {
+    return JSON.parse(await fsp.readFile(playlistFile(), 'utf8'));
+  } catch (e) {
+    if (e && e.code !== 'ENOENT') await appendDebug('ERROR playlist-get: ' + (e.message || e));
+    return null;
+  }
+});
+ipcMain.handle('playlist-set', async (_e, data) => {
+  const f = playlistFile();
+  try {
+    await fsp.mkdir(path.dirname(f), { recursive: true });
+    const tmp = f + '.tmp';
+    await fsp.writeFile(tmp, JSON.stringify(data || {}), 'utf8');
+    await fsp.rename(tmp, f);        // reemplazo atómico: nunca deja el JSON a medias
+    return true;
+  } catch (e) {
+    await appendDebug('ERROR playlist-set: ' + (e && e.message || e));
+    return false;
+  }
+});
+ipcMain.handle('file-exists', async (_e, p) => {
+  try { return (await fsp.stat(String(p || ''))).isFile(); }
+  catch (e) { return false; }
+});
+
+// Diagnóstico: registrar eventos clave en userData/debug.log (máx ~200 KB)
+ipcMain.handle('debug-log', async (_e, msg) => {
+  await appendDebug(String(msg || ''));
+  return true;
+});
+
+// ====== Búsqueda de letras (en el proceso principal: sin CORS) ====== */
+async function lyricsFetch(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+      }
+    });
+    if (!res.ok) {
+      const e = new Error('HTTP ' + res.status);
+      e.status = res.status;
+      throw e;
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const isNetError = (msg) => /failed|ENOTFOUND|ECONN|EAI_AGAIN|abort|network|ECONNREFUSED|ETIMEDOUT/i.test(msg);
+
+ipcMain.handle('search-lyrics', async (_event, payload) => {
+  const p = (payload && typeof payload === 'object') ? payload : { q: payload };
+  const enc = (s) => encodeURIComponent(String(s || '').slice(0, 200));
+  const dur = Math.round(Number(p.duration) || 0);
+
+  // 1) Coincidencia EXACTA con título + artista + duración (letra sincronizada fiable)
+  if (p.exact && p.title && p.artist && dur > 30) {
+    try {
+      const url = 'https://lrclib.net/api/get?track_name=' + enc(p.title) +
+                  '&artist_name=' + enc(p.artist) + '&duration=' + dur;
+      const data = await lyricsFetch(url);
+      // Validar que la entrada devuelta corresponde de verdad al título pedido:
+      // con archivos cuyos campos artista/título vienen cambiados, la coincidencia
+      // exacta podía traer la letra de OTRA versión (p. ej. la inglesa). Si el
+      // título no se parece, se descarta y se sigue con la búsqueda normal.
+      const parecido = (a, b) => {
+        const na = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const ta = new Set(na(a).split(/[^a-z0-9]+/).filter(w => w.length > 1 && !/^\d+$/.test(w)));
+        const tb = new Set(na(b).split(/[^a-z0-9]+/).filter(w => w.length > 1 && !/^\d+$/.test(w)));
+        if (!ta.size || !tb.size) return 0;
+        let hit = 0;
+        ta.forEach(w => { if (tb.has(w)) hit++; });
+        return hit / Math.min(ta.size, tb.size);
+      };
+      if (data && (data.syncedLyrics || data.plainLyrics) && parecido(data.trackName, p.title) >= 0.5) {
+        return { ok: true, data: [data], exact: true };
+      }
+    } catch (err) {
+      if (err && err.status === 404) { /* sin coincidencia exacta: seguimos buscando */ }
+      else if (isNetError(String(err && err.message || err))) {
+        return { ok: false, error: String(err.message || err), net: true };
+      }
+    }
+  }
+
+  // 2) Búsqueda libre con reintentos ante 503 / caídas
+  const url = 'https://lrclib.net/api/search?q=' + enc(p.q);
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const data = await lyricsFetch(url);
+      return { ok: true, data };
+    } catch (err) {
+      lastErr = String(err && err.message || err);
+      // Error de red (sin internet) → no insistir
+      if (isNetError(lastErr)) return { ok: false, error: lastErr, net: true };
+      if (attempt < 2) await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+    }
+  }
+  return { ok: false, error: lastErr };
+});
+
+
+// Colores de la barra de título (Windows) según el tema activo
+ipcMain.on('titlebar-colors', (event, colors) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return;
+  const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+  if (!colors || !isHex(colors.color) || !isHex(colors.symbolColor)) return;
+  try {
+    win.setTitleBarOverlay({ color: colors.color, symbolColor: colors.symbolColor, height: 34 });
+  } catch (e) { /* versión sin soporte: se queda con el color por defecto */ }
+});
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1060,
+    height: 720,
+    minWidth: 420,
+    minHeight: 640,
+    resizable: true,
+    backgroundColor: '#f6f6fa',
+    title: 'Reproductor de Música',
+    icon: path.join(__dirname, 'icon.ico'),
+    autoHideMenuBar: true,
+    // Barra de título integrada: los botones de ventana se pintan según el tema
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#f6f6fa', symbolColor: '#12131a', height: 34 },
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: false
+    }
+  });
+
+  // Menú mínimo (Alt para mostrar)
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: 'Archivo',
+      submenu: [
+        { role: 'quit', label: 'Salir' }
+      ]
+    },
+    {
+      label: 'Ver',
+      submenu: [
+        { role: 'reload', label: 'Recargar' },
+        { role: 'zoomIn', label: 'Acercar' },
+        { role: 'zoomOut', label: 'Alejar' },
+        { role: 'resetZoom', label: 'Tamaño normal' },
+        { role: 'togglefullscreen', label: 'Pantalla completa' }
+      ]
+    },
+    {
+      label: 'Ayuda',
+      submenu: [
+        { role: 'toggleDevTools', label: 'Herramientas de desarrollo' }
+      ]
+    }
+  ]));
+
+  mainWindow.loadFile('index.html', {
+    // En modo prueba la app no restaura ni pisa la lista guardada del usuario
+    query: (process.argv.includes('--selftest') || process.argv.includes('--filetest')) ? { test: '1' } : {}
+  });
+
+  // Diagnóstico: errores de la consola del reproductor visibles en la terminal
+  mainWindow.webContents.on('console-message', (...args) => {
+    const d = (args[1] && typeof args[1] === 'object' && 'message' in args[1])
+      ? args[1]
+      : { level: args[1], message: args[2], line: args[3], sourceId: args[4] };
+    const lvl = ['log', 'info', 'warning', 'error'][Number(d.level) || 0] || 'log';
+    if (lvl === 'warning' || lvl === 'error')
+      console.log('[web:' + lvl + '] ' + d.message + ' (' + d.sourceId + ':' + d.line + ')');
+  });
+
+  // Prueba automática interna: electron . --selftest
+  if (process.argv.includes('--selftest')) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          const result = await mainWindow.webContents.executeJavaScript(SELFTEST_CODE, true);
+          console.log('[SELFTEST] ' + JSON.stringify(result, null, 1));
+        } catch (e) {
+          console.log('[SELFTEST-ERR] ' + (e && (e.stack || e.message) || e));
+        }
+        app.quit();
+      }, 1200);
+    });
+  }
+
+  // Prueba con un archivo REAL del usuario: electron . --filetest "ruta\cancion.mp3"
+  const ftIdx = process.argv.indexOf('--filetest');
+  if (ftIdx > -1 && process.argv[ftIdx + 1]) {
+    const realPath = process.argv[ftIdx + 1];
+    mainWindow.webContents.once('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          const bytes = await fsp.readFile(realPath);
+          const b64 = bytes.toString('base64');
+          const code = REALFILETEST_CODE
+            .replace('__NAME__', JSON.stringify(path.basename(realPath)))
+            .replace('__B64__', JSON.stringify(b64));
+          const result = await mainWindow.webContents.executeJavaScript(code, true);
+          console.log('[FILETEST] ' + JSON.stringify(result, null, 1));
+        } catch (e) {
+          console.log('[FILETEST-ERR] ' + (e && (e.stack || e.message) || e));
+        }
+        app.quit();
+      }, 1200);
+    });
+  }
+
+  // Evita que soltar archivos desde el escritorio navegue fuera de la app
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+// Arrastre y soltamiento de archivos: no navegar a file://
+app.on('web-contents-created', (_e, contents) => {
+  contents.on('will-navigate', (event) => event.preventDefault());
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+});
+
+app.whenReady().then(() => {
+  createWindow();
+  // Comprobar actualizaciones automáticamente al abrir la app.
+  // Si hay versión nueva en GitHub Releases, se descarga y se instala al cerrar.
+  try {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.checkForUpdatesAndNotify();
+  } catch (e) {
+    console.error('autoUpdater:', e && e.message || e);
+  }
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
