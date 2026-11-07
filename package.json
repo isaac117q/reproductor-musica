@@ -1,6 +1,6 @@
 {
   "name": "reproductor-musica",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Reproductor de música para Windows",
   "main": "main.js",
   "scripts": {

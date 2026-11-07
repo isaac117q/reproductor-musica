@@ -365,47 +365,35 @@
   .dlbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
   .dlbtn:disabled { opacity: .55; cursor: default; }
   .lyrics { position: relative; overflow-anchor: none; flex: 1; overflow-y: auto; padding: 26px 26px 10px; display: flex; flex-direction: column; gap: 17px; min-height: 0; }
-  @keyframes lyEnter {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .lyrics .ly {
-    animation: lyEnter .44s cubic-bezier(.22,1,.36,1) both;
-    animation-delay: calc(var(--i, 0) * 18ms);
-  }
   /* Palabras pre-renderizadas: transición suave vinculada a la voz (--wp + --voice) */
   .ly .w {
     display: inline-block;
     position: relative;
-    transition: opacity .32s cubic-bezier(.22,1,.36,1), transform .28s cubic-bezier(.22,1,.36,1), color .28s ease, background-color .28s ease, box-shadow .3s ease, filter .28s ease;
-    will-change: transform, opacity;
+    transition: opacity .28s cubic-bezier(.22,1,.36,1), transform .26s cubic-bezier(.22,1,.36,1), color .26s ease, background-color .26s ease, box-shadow .28s ease, filter .26s ease;
   }
-  /* En la línea activa, cada estilo define --w-fill (color cantado) y --w-unlit (color aún no cantado) */
+  /* En la línea activa, cada estilo define --w-fill (su color principal) */
   .ly.on {
     --w-fill: var(--text);
-    --w-unlit: color-mix(in srgb, var(--ly) 58%, transparent);
     color: var(--text);
     transform: translateX(3px) scale(1.03);
   }
-  /* Palabras de la línea activa que AÚN NO se han cantado: esperan a la voz */
+  /* Palabras de la línea activa que aún no se han cantado: conservan el estilo activo con opacidad suave */
   .ly.on .w {
-    color: var(--w-unlit);
-    opacity: .62;
+    opacity: .56;
     transform: translateY(0) scale(1);
   }
-  /* Palabras YA cantadas: encendidas con el color/efecto del estilo activo */
+  /* Palabras YA cantadas: 100% encendidas con el estilo activo */
   .ly.on .w.done {
-    color: var(--w-fill);
     opacity: 1;
     transform: translateY(0) scale(1);
   }
   /* Palabra que se está cantando AHORA MISMO: barrido progresivo (--wp) + pulso de voz en vivo (--voice) */
   .ly.on .w.cur {
     opacity: 1;
-    transform: translateY(calc(-1.5px - var(--voice, 0) * 1.8px)) scale(calc(1.03 + var(--voice, 0) * 0.025));
+    transform: translateY(calc(-1.5px - var(--voice, 0) * 1.8px)) scale(calc(1.035 + var(--voice, 0) * 0.025));
     background-image: linear-gradient(90deg,
       var(--w-fill) calc(var(--wp, 100%) - 6%),
-      var(--w-unlit) calc(var(--wp, 100%) + 6%));
+      color-mix(in srgb, var(--w-fill) 48%, transparent) calc(var(--wp, 100%) + 6%));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -414,18 +402,18 @@
   .ly {
     font-size: 25px; font-weight: 750; letter-spacing: -.5px; color: var(--ly); line-height: 1.32;
     transition:
-      color .48s cubic-bezier(.22,1,.36,1),
-      opacity .48s cubic-bezier(.22,1,.36,1),
-      transform .5s cubic-bezier(.22,1,.36,1),
-      filter .48s cubic-bezier(.22,1,.36,1),
-      background-color .45s cubic-bezier(.22,1,.36,1),
-      background-size .52s cubic-bezier(.22,1,.36,1),
-      box-shadow .48s cubic-bezier(.22,1,.36,1),
-      text-shadow .48s cubic-bezier(.22,1,.36,1),
-      border-color .45s ease,
-      text-decoration-color .45s ease,
-      text-underline-offset .45s cubic-bezier(.22,1,.36,1),
-      -webkit-text-stroke-color .45s ease;
+      color .42s cubic-bezier(.22,1,.36,1),
+      opacity .42s cubic-bezier(.22,1,.36,1),
+      transform .45s cubic-bezier(.22,1,.36,1),
+      filter .42s cubic-bezier(.22,1,.36,1),
+      background-color .4s cubic-bezier(.22,1,.36,1),
+      background-size .48s cubic-bezier(.22,1,.36,1),
+      box-shadow .42s cubic-bezier(.22,1,.36,1),
+      text-shadow .42s cubic-bezier(.22,1,.36,1),
+      border-color .4s ease,
+      text-decoration-color .4s ease,
+      text-underline-offset .4s cubic-bezier(.22,1,.36,1),
+      -webkit-text-stroke-color .4s ease;
     transform-origin: left center; cursor: pointer;
   }
   .ly:hover { color: var(--ly-hover); transform: translateX(4px); }
@@ -2121,246 +2109,359 @@
   /* --- Animación compartida: flotación suave de las portadas circulares --- */
   @keyframes stFloatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 
-  /* ---------- Estilos de las letras (los 16 estilos vinculados a la voz palabra por palabra) ---------- */
+  /* ---------- Estilos de las letras (16 estilos con efecto y animación propios sincronizados con la voz) ---------- */
+  /* 2. GRANDE: efecto Zoom vocal en la palabra cantada */
   body[data-ly="grande"] .lyrics { gap: 21px; }
-  body[data-ly="grande"] .ly { font-size: 31px; font-weight: 780; line-height: 1.34; }
-  body[data-ly="grande"] .ly.on { transform: translateX(4px) scale(1.035); }
-  body[data-ly="grande"] .ly.dim { font-size: 22px; }
+  body[data-ly="grande"] .lyrics .ly { font-size: 31px; font-weight: 780; line-height: 1.34; }
+  body[data-ly="grande"] .lyrics .ly.on { transform: translateX(4px) scale(1.03); }
+  body[data-ly="grande"] .lyrics .ly.on .w.cur {
+    transform: translateY(calc(-3px - var(--voice, 0) * 2.5px)) scale(calc(1.12 + var(--voice, 0) * 0.05));
+    color: var(--accent); -webkit-text-fill-color: var(--accent); background: none;
+  }
+  body[data-ly="grande"] .lyrics .ly.dim { font-size: 22px; }
 
-  body[data-ly="karaoke"] .ly {
+  /* 3. KARAOKE: palabras no cantadas en gris tenue, barrido progresivo en color acento con halo */
+  body[data-ly="karaoke"] .lyrics .ly {
     font-size: 25px; font-weight: 780; letter-spacing: -.4px;
   }
-  body[data-ly="karaoke"] .ly.on {
+  body[data-ly="karaoke"] .lyrics .ly.on {
     --w-fill: var(--accent);
-    color: var(--accent);
-    transform: translateX(4px) scale(1.045);
+    color: var(--ly);
+    transform: translateX(4px) scale(1.04);
   }
-  body[data-ly="karaoke"] .ly.on .w.done {
-    text-shadow: 0 3px 16px color-mix(in srgb, var(--accent) 34%, transparent);
+  body[data-ly="karaoke"] .lyrics .ly.on .w:not(.done):not(.cur) {
+    color: var(--ly); -webkit-text-fill-color: var(--ly); opacity: .65;
   }
-  body[data-ly="karaoke"] .ly.on .w.cur {
-    filter: drop-shadow(0 2px calc(6px + var(--voice, 0) * 10px) color-mix(in srgb, var(--accent) 45%, transparent));
+  body[data-ly="karaoke"] .lyrics .ly.on .w.done {
+    color: var(--accent); -webkit-text-fill-color: var(--accent); opacity: 1;
+    text-shadow: 0 3px 16px color-mix(in srgb, var(--accent) 36%, transparent);
   }
-  body[data-ly="karaoke"] .ly:hover { color: var(--accent); opacity: .82; transform: translateX(4px); }
+  body[data-ly="karaoke"] .lyrics .ly.on .w.cur {
+    opacity: 1;
+    background-image: linear-gradient(90deg,
+      var(--accent) calc(var(--wp, 100%) - 5%),
+      var(--ly) calc(var(--wp, 100%) + 5%));
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px calc(6px + var(--voice, 0) * 10px) color-mix(in srgb, var(--accent) 48%, transparent));
+  }
+  body[data-ly="karaoke"] .lyrics .ly:hover { color: var(--accent); opacity: .85; transform: translateX(4px); }
 
-  body[data-ly="clasico"] .ly {
+  /* 4. CLÁSICO: efecto pluma caligráfica con inclinación viva al cantar cada palabra */
+  body[data-ly="clasico"] .lyrics .ly {
     font-family: Georgia, "Times New Roman", serif;
     font-style: italic; font-weight: 600; font-size: 24.5px; letter-spacing: 0;
   }
-  body[data-ly="clasico"] .ly.on {
+  body[data-ly="clasico"] .lyrics .ly.on {
     --w-fill: var(--accent);
     color: var(--accent);
+    font-style: italic;
     transform: translateX(5px) scale(1.03);
   }
-  body[data-ly="clasico"] .ly.head { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-style: normal; }
-
-  body[data-ly="compacto"] .lyrics { gap: 11px; }
-  body[data-ly="compacto"] .ly { font-size: 19px; font-weight: 680; line-height: 1.3; letter-spacing: -.3px; }
-  body[data-ly="compacto"] .ly.on { transform: translateX(4px) scale(1.025); }
-  body[data-ly="compacto"] .ly.dim { font-size: 15px; }
-
-  body[data-ly="marcador"] .ly {
-    font-size: 23px; font-weight: 720;
-    border-radius: 12px; padding: 5px 14px; margin: -5px -14px;
-    background-color: transparent;
-    box-shadow: 0 0 0 rgba(20,24,60,0);
+  body[data-ly="clasico"] .lyrics .ly.on .w.cur {
+    transform: translateY(-2px) skewX(-6deg) scale(1.06);
   }
-  body[data-ly="marcador"] .ly.on {
-    --w-fill: var(--accent);
-    color: var(--accent); background-color: var(--accent-soft);
-    box-shadow: 0 8px 22px rgba(20,24,60,.12);
+  body[data-ly="clasico"] .lyrics .ly.head { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-style: normal; }
+
+  /* 5. COMPACTO: deslizamiento ágil por palabra */
+  body[data-ly="compacto"] .lyrics { gap: 11px; }
+  body[data-ly="compacto"] .lyrics .ly { font-size: 19px; font-weight: 680; line-height: 1.3; letter-spacing: -.3px; }
+  body[data-ly="compacto"] .lyrics .ly.on { transform: translateX(4px) scale(1.025); }
+  body[data-ly="compacto"] .lyrics .ly.on .w.cur { transform: translateY(-2.5px); color: var(--accent); -webkit-text-fill-color: var(--accent); background: none; }
+  body[data-ly="compacto"] .lyrics .ly.dim { font-size: 15px; }
+
+  /* 6. MARCADOR: efecto plumón resaltador que pinta el fondo detrás de cada palabra de 0% a 100% (--wp) */
+  body[data-ly="marcador"] .lyrics .ly:not(.head) {
+    font-size: 23px; font-weight: 720;
+  }
+  body[data-ly="marcador"] .lyrics .ly.on {
+    color: var(--text);
     transform: translateX(4px) scale(1.02);
   }
-  body[data-ly="marcador"] .ly:hover { color: var(--accent); }
-
-  body[data-ly="subrayado"] .ly {
-    font-size: 24px; font-weight: 700;
+  body[data-ly="marcador"] .lyrics .ly.on .w {
+    padding: 2px 6px; margin: -2px -2px; border-radius: 7px;
+    background-image: linear-gradient(90deg, var(--accent-soft), var(--accent-soft));
+    background-repeat: no-repeat;
+    background-size: 0% 100%;
+    -webkit-background-clip: border-box; background-clip: border-box;
+    color: var(--ly); -webkit-text-fill-color: var(--ly); opacity: .75;
   }
-  body[data-ly="subrayado"] .ly.on {
+  body[data-ly="marcador"] .lyrics .ly.on .w.cur {
+    opacity: 1;
+    color: var(--accent); -webkit-text-fill-color: var(--accent);
+    background-image: linear-gradient(90deg, var(--accent-soft), var(--accent-soft));
+    background-size: var(--wp, 100%) 100%;
+    -webkit-background-clip: border-box; background-clip: border-box;
+    box-shadow: 0 4px 12px rgba(20,24,60,.1);
+  }
+  body[data-ly="marcador"] .lyrics .ly.on .w.done {
+    opacity: 1;
+    color: var(--accent); -webkit-text-fill-color: var(--accent);
+    background-size: 100% 100%;
+  }
+  body[data-ly="marcador"] .lyrics .ly:hover { color: var(--accent); }
+
+  /* 7. SUBRAYADO: barra láser inferior que crece de 0% a 100% bajo cada palabra al ritmo de la voz */
+  body[data-ly="subrayado"] .lyrics .ly:not(.head) {
+    font-size: 24px; font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--accent) 28%, transparent);
+    text-decoration-thickness: 2.5px;
+    text-underline-offset: 6px;
+  }
+  body[data-ly="subrayado"] .lyrics .ly.on {
     --w-fill: var(--text);
     color: var(--text);
+    text-decoration: none;
     transform: translateX(4px) scale(1.025);
   }
-  /* El subrayado avanza palabra por palabra con la voz (--wp) */
-  body[data-ly="subrayado"] .ly.on .w::after {
+  body[data-ly="subrayado"] .lyrics .ly.on .w::before {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: -3px;
+    height: 3.5px; border-radius: 99px;
+    background: color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+  body[data-ly="subrayado"] .lyrics .ly.on .w::after {
     content: "";
     position: absolute; left: 0; bottom: -3px;
     height: 3.5px; width: 0%;
     border-radius: 99px;
     background: var(--accent);
-    transition: width .08s linear;
+    transition: width .06s linear;
   }
-  body[data-ly="subrayado"] .ly.on .w.cur::after {
+  body[data-ly="subrayado"] .lyrics .ly.on .w.cur::after {
     width: var(--wp, 100%);
-    box-shadow: 0 0 calc(4px + var(--voice, 0) * 8px) var(--accent);
+    box-shadow: 0 0 calc(6px + var(--voice, 0) * 10px) var(--accent);
   }
-  body[data-ly="subrayado"] .ly.on .w.done::after {
+  body[data-ly="subrayado"] .lyrics .ly.on .w.done::after {
     width: 100%;
   }
 
-  body[data-ly="mono"] .ly { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 21px; font-weight: 600; letter-spacing: 0; }
-  body[data-ly="mono"] .ly.on { --w-fill: var(--accent); color: var(--accent); transform: translateX(5px) scale(1.025); }
-  body[data-ly="mono"] .ly.head { font-family: "Cascadia Mono", Consolas, monospace; }
+  /* 8. MONO: efecto bloque escáner de consola en la palabra activa */
+  body[data-ly="mono"] .lyrics .ly { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 21px; font-weight: 600; letter-spacing: 0; }
+  body[data-ly="mono"] .lyrics .ly.on { --w-fill: var(--accent); color: var(--accent); transform: translateX(5px) scale(1.025); }
+  body[data-ly="mono"] .lyrics .ly.on .w.cur {
+    background-image: linear-gradient(90deg, var(--accent-soft) var(--wp, 100%), transparent var(--wp, 100%));
+    -webkit-background-clip: border-box; background-clip: border-box;
+    color: var(--accent); -webkit-text-fill-color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+  }
+  body[data-ly="mono"] .lyrics .ly.head { font-family: "Cascadia Mono", Consolas, monospace; }
 
-  /* ---------- Estilos de letra añadidos en 1.5.0 ---------- */
-  body[data-ly="enfoque"] .ly {
+  /* 9. ENFOQUE: desenfoque que se limpia palabra por palabra cuando la voz la pronuncia */
+  body[data-ly="enfoque"] .lyrics .ly {
     font-size: 26px; font-weight: 800; letter-spacing: -.55px;
-    filter: blur(2.2px); opacity: .36; transform: scale(.94); transform-origin: left center;
-    transition: filter .54s cubic-bezier(.22,1,.36,1), opacity .54s cubic-bezier(.22,1,.36,1), transform .56s cubic-bezier(.22,1,.36,1), color .45s ease;
+    filter: blur(2.4px); opacity: .34 !important; transform: scale(.94); transform-origin: left center;
+    transition: filter .5s cubic-bezier(.22,1,.36,1), opacity .5s cubic-bezier(.22,1,.36,1), transform .52s cubic-bezier(.22,1,.36,1), color .42s ease;
   }
-  body[data-ly="enfoque"] .ly.on {
-    filter: blur(0px); opacity: 1; transform: translateX(4px) scale(1.055);
+  body[data-ly="enfoque"] .lyrics .ly.on {
+    filter: blur(0px); opacity: 1 !important; transform: translateX(4px) scale(1.055);
   }
-  /* En enfoque, las palabras aún no cantadas tienen un leve desenfoque que se limpia al cantarlas */
-  body[data-ly="enfoque"] .ly.on .w:not(.done):not(.cur) { filter: blur(.6px); opacity: .48; }
-  body[data-ly="enfoque"] .ly.on .w.cur,
-  body[data-ly="enfoque"] .ly.on .w.done { filter: blur(0px); }
-  body[data-ly="enfoque"] .ly.head,
-  body[data-ly="enfoque"] .ly.dim,
-  body[data-ly="enfoque"] .ly-note { filter: none; opacity: 1; transform: none; }
+  body[data-ly="enfoque"] .lyrics .ly.on .w:not(.done):not(.cur) {
+    filter: blur(1.8px); opacity: .42;
+  }
+  body[data-ly="enfoque"] .lyrics .ly.on .w.cur {
+    filter: blur(0px); opacity: 1;
+    transform: translateY(-2px) scale(1.08);
+  }
+  body[data-ly="enfoque"] .lyrics .ly.on .w.done {
+    filter: blur(0px); opacity: 1;
+  }
+  body[data-ly="enfoque"] .lyrics .ly.head,
+  body[data-ly="enfoque"] .lyrics .ly.dim,
+  body[data-ly="enfoque"] .lyrics .ly-note { filter: none; opacity: 1 !important; transform: none; }
 
-  /* Neón: cada palabra enciende su tubo neón cuando la voz la canta (no toda la línea de golpe) */
-  body[data-ly="neon"] .ly {
+  /* 10. NEÓN: palabras no cantadas con tubo apagado; al cantarlas se enciende el tubo neón */
+  body[data-ly="neon"] .lyrics .ly:not(.head) {
     font-weight: 800;
+    color: color-mix(in srgb, var(--text) 70%, var(--accent));
+    text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 24%, transparent);
   }
-  body[data-ly="neon"] .ly.on {
+  body[data-ly="neon"] .lyrics .ly.on {
     --w-fill: var(--text);
     color: var(--text);
     transform: translateX(4px) scale(1.035);
+    text-shadow: none;
   }
-  body[data-ly="neon"] .ly.on .w.cur {
-    filter:
-      drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 90%, #fff))
-      drop-shadow(0 0 calc(8px + var(--voice, 0) * 12px) color-mix(in srgb, var(--accent) 75%, transparent));
+  body[data-ly="neon"] .lyrics .ly.on .w:not(.done):not(.cur) {
+    opacity: .42; text-shadow: none;
   }
-  body[data-ly="neon"] .ly.on .w.done {
+  body[data-ly="neon"] .lyrics .ly.on .w.cur {
+    opacity: 1;
+    color: #fff; -webkit-text-fill-color: #fff; background: none;
     text-shadow:
-      0 0 3px color-mix(in srgb, var(--accent) 90%, #fff),
-      0 0 14px color-mix(in srgb, var(--accent) 68%, transparent),
-      0 0 30px color-mix(in srgb, var(--accent) 44%, transparent);
+      0 0 4px #fff,
+      0 0 calc(10px + var(--voice, 0) * 14px) var(--accent),
+      0 0 calc(22px + var(--voice, 0) * 20px) var(--accent);
+    transform: translateY(-2px) scale(1.06);
+  }
+  body[data-ly="neon"] .lyrics .ly.on .w.done {
+    opacity: 1;
+    text-shadow:
+      0 0 3px color-mix(in srgb, var(--accent) 92%, #fff),
+      0 0 14px color-mix(in srgb, var(--accent) 75%, transparent),
+      0 0 28px color-mix(in srgb, var(--accent) 50%, transparent);
   }
 
-  /* Gradiente: el degradado avanza palabra por palabra con la voz (--wp) */
-  body[data-ly="gradiente"] .ly {
-    font-weight: 800; letter-spacing: -.55px;
+  /* 11. GRADIENTE: ola cromática que levanta y pinta cada palabra al cantarse */
+  body[data-ly="gradiente"] .lyrics .ly:not(.head) {
+    font-weight: 830; letter-spacing: -.55px;
   }
-  body[data-ly="gradiente"] .ly.on {
-    color: var(--text); background: none;
-    transform: translateX(4px) scale(1.035);
-  }
-  body[data-ly="gradiente"] .ly.on .w:not(.done):not(.cur) {
-    background: none;
-    color: var(--w-unlit);
-    -webkit-text-fill-color: var(--w-unlit);
-  }
-  body[data-ly="gradiente"] .ly.on .w.done {
-    opacity: 1;
+  body[data-ly="gradiente"] .lyrics .ly:not(.head) .w {
     background-image: linear-gradient(92deg, var(--accent), var(--viz2));
     -webkit-background-clip: text; background-clip: text;
     color: transparent; -webkit-text-fill-color: transparent;
   }
-  body[data-ly="gradiente"] .ly.on .w.cur {
+  body[data-ly="gradiente"] .lyrics .ly.on {
+    color: var(--text); background: none;
+    transform: translateX(4px) scale(1.035);
+  }
+  body[data-ly="gradiente"] .lyrics .ly.on .w {
+    opacity: .42;
+  }
+  body[data-ly="gradiente"] .lyrics .ly.on .w.done {
     opacity: 1;
+  }
+  body[data-ly="gradiente"] .lyrics .ly.on .w.cur {
+    opacity: 1;
+    transform: translateY(-3.5px) scale(1.07);
     background-image: linear-gradient(90deg,
       var(--accent) 0%,
-      var(--viz2) calc(var(--wp, 100%) - 6%),
-      var(--w-unlit) calc(var(--wp, 100%) + 6%));
+      var(--viz2) calc(var(--wp, 100%) - 5%),
+      color-mix(in srgb, var(--accent) 30%, transparent) calc(var(--wp, 100%) + 5%));
     -webkit-background-clip: text; background-clip: text;
     color: transparent; -webkit-text-fill-color: transparent;
   }
 
-  body[data-ly="cinta"] .ly {
-    border-left: 4px solid transparent; border-radius: 0 10px 10px 0;
-    padding: 5px 14px 5px 12px; margin: -5px -14px -5px -16px;
-    background-image: linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 62%);
-    background-size: 0% 100%; background-repeat: no-repeat;
+  /* 12. CINTA: cinta lateral con barrido de luz por palabra */
+  body[data-ly="cinta"] .lyrics .ly:not(.head) {
+    border-left: 3px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    border-radius: 0 10px 10px 0;
+    padding: 5px 14px 5px 12px; margin: -3px -14px -3px -16px;
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 65%);
+    background-size: 35% 100%; background-repeat: no-repeat;
   }
-  body[data-ly="cinta"] .ly.on {
-    --w-fill: var(--text);
-    border-left-color: var(--accent);
+  body[data-ly="cinta"] .lyrics .ly.on {
+    --w-fill: var(--accent);
+    border-left: 4px solid var(--accent);
     background-size: 100% 100%;
     transform: translateX(4px);
   }
+  body[data-ly="cinta"] .lyrics .ly.on .w.done { color: var(--text); -webkit-text-fill-color: var(--text); }
 
-  /* Contorno: las palabras no cantadas son contorno hueco y se rellenan por dentro al cantarlas */
-  body[data-ly="contorno"] .ly {
-    font-weight: 830; letter-spacing: -.5px;
-    -webkit-text-stroke: 1.2px transparent;
+  /* 13. CONTORNO: letras huecas que se rellenan de color sólido por dentro al cantarlas */
+  body[data-ly="contorno"] .lyrics .ly:not(.head) {
+    font-weight: 850; letter-spacing: -.5px;
+    color: transparent; -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 1.1px color-mix(in srgb, var(--accent) 55%, var(--ly));
   }
-  body[data-ly="contorno"] .ly.on {
+  body[data-ly="contorno"] .lyrics .ly.on {
+    color: transparent; -webkit-text-stroke: 1.3px var(--accent);
     transform: translateX(4px) scale(1.03);
   }
-  body[data-ly="contorno"] .ly.on .w:not(.done):not(.cur) {
+  body[data-ly="contorno"] .lyrics .ly.on .w:not(.done):not(.cur) {
     color: transparent; -webkit-text-fill-color: transparent;
-    -webkit-text-stroke: 1.2px color-mix(in srgb, var(--accent) 62%, transparent);
-    opacity: .78;
+    -webkit-text-stroke: 1.3px var(--accent);
+    opacity: .65;
   }
-  body[data-ly="contorno"] .ly.on .w.cur {
+  body[data-ly="contorno"] .lyrics .ly.on .w.cur {
     opacity: 1;
-    -webkit-text-stroke: 1.2px var(--accent);
+    -webkit-text-stroke: 1.3px var(--accent);
     background-image: linear-gradient(90deg,
-      var(--accent) calc(var(--wp, 100%) - 6%),
-      transparent calc(var(--wp, 100%) + 6%));
+      var(--accent) calc(var(--wp, 100%) - 5%),
+      transparent calc(var(--wp, 100%) + 5%));
     -webkit-background-clip: text; background-clip: text;
     color: transparent; -webkit-text-fill-color: transparent;
   }
-  body[data-ly="contorno"] .ly.on .w.done {
+  body[data-ly="contorno"] .lyrics .ly.on .w.done {
     opacity: 1;
-    -webkit-text-stroke: 1.2px var(--accent);
-    color: var(--accent); -webkit-text-fill-color: var(--accent);
+    -webkit-text-stroke: 1.3px var(--accent);
+    color: var(--accent);
+    -webkit-text-fill-color: var(--accent);
   }
 
-  /* Máquina de escribir: el cursor ▍ avanza en la palabra que se está cantando */
-  body[data-ly="typewriter"] .ly {
+  /* 14. MÁQUINA DE ESCRIBIR ("como estás escribiendo"): escribe letra por letra en vivo con el cursor ▍ */
+  body[data-ly="typewriter"] .lyrics .ly {
     font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
     font-size: 20px; font-weight: 600; letter-spacing: 0; line-height: 1.45;
   }
-  body[data-ly="typewriter"] .ly.on { --w-fill: var(--accent); transform: translateX(4px); }
-  body[data-ly="typewriter"] .ly.on .w.cur::after {
-    content: "▍"; color: var(--accent); -webkit-text-fill-color: var(--accent); margin-left: 2px;
-    animation: caret .9s steps(1) infinite;
+  body[data-ly="typewriter"] .lyrics .ly.on {
+    --w-fill: var(--text);
+    transform: translateX(4px);
   }
-  body[data-ly="typewriter"] .ly.head { font-family: inherit; }
+  /* Palabras futuras en la línea activa: aún NO se han escrito (ocultas) */
+  body[data-ly="typewriter"] .lyrics .ly.on:has(.w.cur, .w.done) .w:not(.done):not(.cur) {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  /* Palabra que se está escribiendo AHORA MISMO: aparece letra por letra de 0% a 100% (--wp) */
+  body[data-ly="typewriter"] .lyrics .ly.on .w.cur {
+    opacity: 1;
+    transform: none;
+    background-image: linear-gradient(90deg,
+      var(--accent) var(--wp, 100%),
+      transparent var(--wp, 100%));
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+  }
+  /* El cursor ▍ avanza pegado a la palabra que se está escribiendo */
+  body[data-ly="typewriter"] .lyrics .ly.on:not(:has(.w.cur))::after,
+  body[data-ly="typewriter"] .lyrics .ly.on .w.cur::after {
+    content: "▍"; color: var(--accent); -webkit-text-fill-color: var(--accent); margin-left: 1px;
+    animation: caret .65s steps(1) infinite;
+  }
+  body[data-ly="typewriter"] .lyrics .ly.on .w.done {
+    opacity: 1;
+    color: var(--text); -webkit-text-fill-color: var(--text);
+  }
+  body[data-ly="typewriter"] .lyrics .ly.head { font-family: inherit; }
   @keyframes caret { 50% { opacity: 0; } }
 
-  body[data-ly="manuscrito"] .ly {
+  /* 15. MANUSCRITO: trazo a mano con giro vivo en cada palabra cantada */
+  body[data-ly="manuscrito"] .lyrics .ly {
     font-family: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive;
     font-size: 24px; font-weight: 600; letter-spacing: 0; line-height: 1.45;
+    transform: rotate(-.6deg); transform-origin: left center;
   }
-  body[data-ly="manuscrito"] .ly.on {
+  body[data-ly="manuscrito"] .lyrics .ly.on {
     --w-fill: var(--accent);
-    color: var(--accent); transform: translateX(4px) rotate(-1deg) scale(1.03); transform-origin: left center;
+    color: var(--accent); transform: translateX(4px) rotate(-1.4deg) scale(1.03); transform-origin: left center;
   }
-  body[data-ly="manuscrito"] .ly.head { font-family: inherit; }
+  body[data-ly="manuscrito"] .lyrics .ly.on .w.cur {
+    transform: translateY(-3px) rotate(-3.5deg) scale(1.09);
+  }
+  body[data-ly="manuscrito"] .lyrics .ly.head { font-family: inherit; transform: none; }
 
-  /* Palabra: la pastilla se llena progresivamente con la voz (--wp) y pulsa con --voice */
-  body[data-ly="palabra"] .ly .w {
-    padding: 1px 6px; margin: -1px -3px; border-radius: 7px;
-    background-color: transparent;
+  /* 16. PALABRA: cápsula saltarina que salta y se llena con la voz (--wp) */
+  body[data-ly="palabra"] .lyrics .ly:not(.head) .w {
+    padding: 1px 6px; margin: 1px 1px; border-radius: 7px;
+    background-color: color-mix(in srgb, var(--chip) 75%, transparent);
     box-shadow: 0 0 0 0 transparent;
     transition:
-      color .28s cubic-bezier(.22,1,.36,1),
-      background-color .28s cubic-bezier(.22,1,.36,1),
-      box-shadow .3s cubic-bezier(.22,1,.36,1),
-      transform .28s cubic-bezier(.22,1,.36,1),
-      opacity .28s ease;
+      color .26s cubic-bezier(.22,1,.36,1),
+      background-color .26s cubic-bezier(.22,1,.36,1),
+      box-shadow .28s cubic-bezier(.22,1,.36,1),
+      transform .26s cubic-bezier(.22,1,.36,1),
+      opacity .26s ease;
   }
-  body[data-ly="palabra"] .ly.on { color: var(--ly-hover); transform: translateX(3px) scale(1.02); }
-  body[data-ly="palabra"] .ly.on .w { opacity: .68; color: var(--w-unlit); }
-  body[data-ly="palabra"] .ly.on .w.done {
+  body[data-ly="palabra"] .lyrics .ly.on { color: var(--ly-hover); transform: translateX(3px) scale(1.02); }
+  body[data-ly="palabra"] .lyrics .ly.on .w { opacity: .75; background-color: transparent; }
+  body[data-ly="palabra"] .lyrics .ly.on .w.done {
     opacity: 1; color: var(--accent); -webkit-text-fill-color: var(--accent);
     background-color: var(--accent-soft);
     transform: translateY(0) scale(1);
   }
-  body[data-ly="palabra"] .ly.on .w.cur {
+  body[data-ly="palabra"] .lyrics .ly.on:not(:has(.w.cur)):not(:has(.w.done)) .w:first-child,
+  body[data-ly="palabra"] .lyrics .ly.on .w.cur {
     opacity: 1;
     color: var(--bg); -webkit-text-fill-color: var(--bg);
+    background-color: var(--accent);
     background-image: linear-gradient(90deg,
       var(--accent) calc(var(--wp, 100%) - 6%),
-      color-mix(in srgb, var(--accent) 28%, transparent) calc(var(--wp, 100%) + 6%));
+      color-mix(in srgb, var(--accent) 55%, var(--bg)) calc(var(--wp, 100%) + 6%));
     -webkit-background-clip: border-box; background-clip: border-box;
-    box-shadow: 0 4px calc(12px + var(--voice, 0) * 10px) color-mix(in srgb, var(--accent) 42%, transparent);
-    transform: translateY(calc(-2px - var(--voice, 0) * 1.5px)) scale(calc(1.05 + var(--voice, 0) * 0.025));
+    box-shadow: 0 4px calc(10px + var(--voice, 0) * 10px) color-mix(in srgb, var(--accent) 42%, transparent);
+    transform: translateY(calc(-3px - var(--voice, 0) * 2px)) scale(calc(1.08 + var(--voice, 0) * 0.03));
   }
 
   /* ---------- Selector de tema y estilo (pestaña "Tema") ---------- */
@@ -2463,7 +2564,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.0</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.1</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -6038,6 +6139,9 @@
       if (lines[mid].t <= now + .05) { idx = mid; lo = mid + 1; }
       else hi = mid - 1;
     }
+    // Si la canción está en la intro (antes de la primera línea) o en pausa al inicio,
+    // dejar seleccionada la primera línea (idx = 0) para que siempre se vea el estilo activo.
+    if (idx < 0 && lines.length > 0) idx = 0;
     const box = $('lyricsBox');
     const el = idx >= 0 ? box.querySelector(`.ly[data-i="${idx}"]`) : null;
     // Si la frase ya terminó y queda un instrumental largo antes de la línea
@@ -6503,7 +6607,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.0';
+  let APP_VERSION = '2.3.1';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
