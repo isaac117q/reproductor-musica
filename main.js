@@ -18,7 +18,34 @@ autoUpdater.on('update-downloaded', (info) => {
   if (win) win.webContents.send('update-downloaded', info.version);
 });
 
+// Progreso de la descarga: el botón "Actualizar" muestra el porcentaje y una
+// barra de carga mientras se baja la nueva versión.
+autoUpdater.on('download-progress', (p) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) return;
+  const pct = Math.max(0, Math.min(100, Math.round(Number(p && p.percent) || 0)));
+  win.webContents.send('update-progress', {
+    percent: pct,
+    transferred: p && p.transferred,
+    total: p && p.total
+  });
+});
+
+// La comprobación terminó y no hay versión nueva: el botón vuelve a su estado
+// normal (sin punto de aviso).
+autoUpdater.on('update-not-available', () => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-not-available');
+});
+
+autoUpdater.on('checking-for-update', () => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-checking');
+});
+
 autoUpdater.on('error', (err) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-error', String(err && err.message || err));
   console.error('autoUpdater error:', err && err.message || err);
 });
 const fsp = fs.promises;
@@ -605,7 +632,11 @@ app.whenReady().then(() => {
 ipcMain.handle('check-for-updates', async () => {
   try {
     const result = await autoUpdater.checkForUpdates();
-    return { ok: true, version: result && result.updateInfo ? result.updateInfo.version : null };
+    const info = result && result.updateInfo;
+    const available = !!(result && result.isUpdateAvailable);
+    // No basta con devolver la versión publicada: si ya es la instalada no hay
+    // actualización. `isUpdateAvailable` lo decide electron-updater.
+    return { ok: true, available, version: available && info ? info.version : null };
   } catch (e) {
     return { ok: false, error: e && e.message || String(e) };
   }
@@ -613,4 +644,28 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('install-update', () => {
   autoUpdater.quitAndInstall();
+});
+
+// Versión real de la app (la insignia de la barra superior ya no se queda fija
+// en una versión vieja escrita a mano).
+ipcMain.handle('app-version', () => app.getVersion());
+
+// Consulta silenciosa de la última versión publicada. NO descarga nada: solo
+// sirve para poner el punto de aviso en el botón "Actualizar". La descarga y la
+// instalación siguen siendo manuales (botón + cerrar la app).
+ipcMain.handle('latest-version', async () => {
+  try {
+    const r = await fetch('https://api.github.com/repos/isaac117q/reproductor-musica/releases/latest', {
+      headers: { 'User-Agent': 'reproductor-musica', 'Accept': 'application/vnd.github+json' }
+    });
+    if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+    const j = await r.json();
+    return {
+      ok: true,
+      version: String(j && j.tag_name || '').replace(/^v/i, ''),
+      url: j && j.html_url
+    };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
 });

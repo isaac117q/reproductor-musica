@@ -34,9 +34,16 @@ contextBridge.exposeInMainWorld('playerAPI', {
   // Colores de la barra de título nativa según el tema activo
   setTitleBarColors: (colors) => ipcRenderer.send('titlebar-colors', colors),
 
-  // Actualizaciones autom�ticas
+  // Actualizaciones manuales (solo al pulsar "Actualizar")
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
+  getVersion: () => ipcRenderer.invoke('app-version'),
+  // Última versión publicada en GitHub (solo consulta, no descarga nada)
+  latestVersion: () => ipcRenderer.invoke('latest-version'),
   onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (e, v) => cb(v)),
-  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (e, v) => cb(v))
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (e, v) => cb(v)),
+  onUpdateProgress: (cb) => ipcRenderer.on('update-progress', (e, p) => cb(p)),
+  onUpdateNotAvailable: (cb) => ipcRenderer.on('update-not-available', () => cb()),
+  onUpdateChecking: (cb) => ipcRenderer.on('update-checking', () => cb()),
+  onUpdateError: (cb) => ipcRenderer.on('update-error', (e, msg) => cb(msg))
 });

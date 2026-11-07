@@ -129,6 +129,27 @@
   @keyframes netpulse { 50% { opacity: .3; } }
   .tool.primary { background: var(--text); color: var(--panel); border-color: var(--text); }
   .tool.primary:hover { color: var(--panel); background: var(--text); opacity: .88; }
+  /* Botón "Actualizar": carga en curso y punto de aviso de versión nueva */
+  #btnUpdate { position: relative; overflow: hidden; }
+  #btnUpdate .ic { flex: none; }
+  #btnUpdate.upd-busy { border-color: var(--accent); color: var(--accent); }
+  #btnUpdate.upd-busy .ic { animation: spin 1s linear infinite; }
+  #btnUpdate.upd-busy::after {
+    content: ""; position: absolute; left: 0; bottom: 0; height: 2px;
+    width: var(--upd-p, 0%); background: var(--accent);
+    border-radius: 0 99px 99px 0; transition: width .25s ease;
+  }
+  #btnUpdate .upd-dot {
+    position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--accent); display: none;
+    box-shadow: 0 0 0 2px var(--tool), 0 0 7px var(--accent);
+    animation: updpulse 1.7s ease-in-out infinite;
+  }
+  #btnUpdate.has-upd { border-color: var(--accent); }
+  #btnUpdate.has-upd .upd-dot { display: block; }
+  #btnUpdate.upd-ready .upd-dot { animation: none; background: #23b26d; box-shadow: 0 0 0 2px var(--tool), 0 0 7px #23b26d; }
+  @keyframes updpulse { 50% { transform: scale(.55); opacity: .45; } }
+  @media (max-width: 720px) { #btnUpdate .upd-dot { top: 3px; right: 3px; } }
 
   /* ---------- Layout ---------- */
   .layout {
@@ -2178,7 +2199,7 @@
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
     <button class="tool" id="btnAddDir" title="Agregar una carpeta completa"><svg class="ic" style="width:15px;height:15px"><use href="#i-folder"/></svg> Carpeta</button>
-    <button class="tool" id="btnUpdate" title="Buscar actualizaciones"><svg class="ic" style="width:15px;height:15px"><use href="#i-download"/></svg> Actualizar</button>
+    <button class="tool" id="btnUpdate" title="Buscar actualizaciones"><svg class="ic" style="width:15px;height:15px"><use href="#i-download"/></svg><span id="updLabel">Actualizar</span><span class="upd-dot" id="updDot" aria-hidden="true"></span></button>
     <span class="netst" id="netSt" title="Estado de la conexión a internet"><i id="netDot">●</i> <span id="netTxt">En línea</span></span>
     <button class="tool" id="btnHelp" title="Atajos de teclado (?)"><svg class="ic" style="width:15px;height:15px"><use href="#i-help"/></svg></button>
   </header>
@@ -3320,6 +3341,11 @@
     out.estimated = /\[re:[^\]]*aproximad[^\]]*\]/i.test(rawText) || looksEstimatedTimes(out);
     out.voiceAligned = /\[re:[^\]]*alineada[^\]]*\]/i.test(rawText);
     out.voiceWords = /\[re:[^\]]*palabras[^\]]*\]/i.test(rawText);
+    // Desfase global ya aplicado y guardado: no se vuelve a corregir (antes se
+    // perdía la marca y cada sesión podía acumular otro desplazamiento).
+    out.voiceRefined = /\[re:[^\]]*desfase[^\]]*\]/i.test(rawText);
+    const shm = rawText.match(/\[shift:\s*([+-]?\d+(?:[.,]\d+)?)\s*\]/i);
+    if (shm) out.voiceShift = Number(String(shm[1]).replace(',', '.'));
     if (lm && isFinite(+lm[1])) out.alignedDur = +lm[1];
     return out;
   }
@@ -3441,7 +3467,7 @@
     const extra = {
       dur: d.dur, estimated: d.estimated, vr: d.vr, verified: d.verified,
       voiceAligned: d.voiceAligned, voiceRefined: d.voiceRefined, voiceSnap: d.voiceSnap,
-      voiceWords: d.voiceWords,
+      voiceWords: d.voiceWords, voiceShift: d.voiceShift,
       fileSig: d.fileSig, alignedDur: d.alignedDur
     };
     if (Array.isArray(d.lines) && d.lines.length) return { type: 'synced', lines: d.lines, source: d.source, ...extra };
@@ -3605,6 +3631,7 @@
                 if (lines.estimated) L.estimated = true;
                 if (lines.voiceAligned) L.voiceAligned = true;
                 if (lines.voiceWords) L.voiceWords = true;
+                if (lines.voiceRefined) { L.voiceRefined = true; L.voiceShift = lines.voiceShift; }
                 if (lines.alignedDur) L.alignedDur = lines.alignedDur;
                 setOfflineLyrics(t, L);
                 return;
@@ -4602,7 +4629,28 @@
     return out;
   }
 
-  // Reparte las líneas de una letra simple entre las frases vocales detectadas.
+  // Reparto de palabras por peso silábico dentro de un tramo ya conocido
+  // [start, end]. Es el respaldo cuando no hay ataques suficientes: mantiene el
+  // resaltado dentro de la frase cantada (nunca se estira hasta el silencio).
+  function wordsByWeight(text, start, end) {
+    const parts = String(text || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length < 2 || !(end > start + 0.3)) return null;
+    const ws = parts.map(syllableWeight);
+    const total = ws.reduce((a, b) => a + b, 0) || 1;
+    let acc = 0;
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+      const t = start + (end - start) * (acc / total);
+      acc += ws[i];
+      const t2 = start + (end - start) * (acc / total);
+      out.push({
+        t: Math.round(t * 100) / 100,
+        end: Math.round(Math.max(t + 0.12, t2) * 100) / 100,
+        text: parts[i]
+      });
+    }
+    return out;
+  }
   // Una línea tarda un tiempo proporcional a su texto; se reparten los grupos
   // entre las frases según la duración cantada (sin la cola instrumental) y luego
   // cada línea se alinea al ataque de voz más cercano. Así una frase instrumental
@@ -4716,6 +4764,25 @@
     L.source = 'alineada con la voz';
   }
 
+  // Guarda el LRC corregido junto al audio con la etiqueta del desfase. Antes se
+  // escribía sin etiquetas y, al volver a cargarlo, la app lo trataba como un LRC
+  // nuevo y podía aplicarle otro desplazamiento (el error se acumulaba).
+  function saveRefinedLrc(t, L) {
+    try {
+      const g = window.playerAPI;
+      const fp = t.path || (g && g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
+      if (!g || !g.saveLrc || !fp || !L || !Array.isArray(L.lines)) return;
+      const tags = [];
+      if (L.estimated) tags.push('[re:avance aproximado]');
+      else if (L.voiceAligned) tags.push('[re:alineada-voz]');
+      else if (L.voiceRefined) tags.push('[re:desfase-voz]');
+      else tags.push('[re:palabras-voz]');
+      if (L.voiceRefined && isFinite(+L.voiceShift)) tags.push('[shift:' + L.voiceShift + ']');
+      if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
+      g.saveLrc(fp, tags.join('\n') + '\n' + L.lines.map(lrcLineText).join('\n')).catch(() => {});
+    } catch (e) { }
+  }
+
   // Ajuste de una letra LRC ya sincronizada.
   //
   // Se comprobó con letras de referencia de lrclib que mover cada línea al ataque de
@@ -4770,19 +4837,9 @@
         L.voiceShift = Math.round(sh * 100) / 100;
         L.voiceRefined = true;
         L.voiceSnap = false;
-        try {
-          const g = window.playerAPI;
-          const fp = t.path || (g && g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
-          if (g && g.saveLrc && fp) {
-            const lrcText = L.lines.map(l => {
-              const sec = Math.max(0, Number(l.t) || 0);
-              const m = Math.floor(sec / 60);
-              const s = (sec % 60).toFixed(2).padStart(5, '0');
-              return '[' + String(m).padStart(2, '0') + ':' + s + ']' + (l.text || '');
-            }).join('\n');
-            g.saveLrc(fp, lrcText).catch(() => {});
-          }
-        } catch (e) { }
+        // Se guarda con etiqueta y desfase: al volver a cargar el .lrc se sabe
+        // que ya está corregido y no se le aplica otro desplazamiento encima.
+        saveRefinedLrc(t, L);
         dbg('voz: ajuste por primer onset [' + title + '] ' + sh.toFixed(1) + 's (pocas pausas)');
         return true;
       }
@@ -4875,19 +4932,7 @@
     L.voiceShift = Math.round(shift * 100) / 100;
     // Persistir el LRC corregido junto a la canción: así el ajuste no se pierde y
     // no hay que recalcularlo en cada reproducción.
-    try {
-      const g = window.playerAPI;
-      const fp = t.path || (g && g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
-      if (g && g.saveLrc && fp) {
-        const lrcText = L.lines.map(l => {
-          const sec = Math.max(0, Number(l.t) || 0);
-          const m = Math.floor(sec / 60);
-          const s = (sec % 60).toFixed(2).padStart(5, '0');
-          return '[' + String(m).padStart(2, '0') + ':' + s + ']' + l.text;
-        }).join('\n');
-        g.saveLrc(fp, lrcText).catch(() => {});
-      }
-    } catch (e) { }
+    saveRefinedLrc(t, L);
     dbg('voz: desfase corregido [' + title + '] ' + L.voiceShift + 's (' + bestS + ' pausas de ' + evL.length + ')');
     return true;
   }
@@ -4932,8 +4977,16 @@
         if (d < bestD) { bestD = d; ph = p; }
       }
       if (ph) end = Math.min(end, Math.max(start + 0.4, ph.end + 0.25));
+      // Sin frase detectada (ad-lib, intro hablado…): el tramo se limita a lo que
+      // tarda en cantarse el texto, para no repartir palabras por un silencio.
+      else end = Math.min(end, start + Math.max(1.2, Math.min(6, String(line.text || '').length * 0.12)));
       if (!(end > start + 0.35)) continue;
-      const words = wordsFromOnsets(line.text, start, end, onsets);
+      // Primero se intenta anclar cada palabra a un ataque real; si la línea es
+      // corta o hay pocos ataques, se reparte por sílabas dentro de la frase
+      // (igual que la alineación por voz) para que el resaltado no se estire
+      // hasta el silencio siguiente.
+      const words = wordsFromOnsets(line.text, start, end, onsets) ||
+                    wordsByWeight(line.text, start, end);
       if (!words) continue;
       line.end = end;
       line.words = words;
@@ -4964,7 +5017,7 @@
     // analizarlo ni arriesgarse a que un refinamiento posterior lo mueva. Salvo
     // que le falten las marcas por palabra.
     const durNow = durSec(t);
-    if ((L.voiceAligned || L.voiceWords) && hasVoiceWords(L) &&
+    if ((L.voiceAligned || L.voiceWords || L.voiceRefined) && hasVoiceWords(L) &&
         isFinite(L.alignedDur) && durNow &&
         Math.abs(L.alignedDur - durNow) <= 2) {
       L.fileSig = curFileSig;
@@ -5018,9 +5071,14 @@
             // añaden las palabras, sin volver a tocar los tiempos de línea.
             refineWordsToVoice(t, A);
           } else {
-            cur.voiceAligned = false;
-            cur.voiceRefined = false; cur.voiceShift = undefined; cur.voiceSnap = false;
-            refineSyncedToVoice(t, A);
+            // Si esta letra ya tenía un desfase aplicado (automático o con
+            // Ctrl+←/→), NO se borra: volver a buscar otro desplazamiento podía
+            // acumular correcciones y dejar el LRC cada vez más desviado.
+            if (!(cur.voiceRefined && isFinite(+cur.voiceShift))) {
+              cur.voiceAligned = false;
+              cur.voiceSnap = false;
+              refineSyncedToVoice(t, A);
+            }
             // Aunque el LRC no necesite desfase, sus líneas no traen tiempos por
             // palabra: se pegan a los ataques de voz para que el resaltado siga al
             // cantante dentro de cada línea.
@@ -5046,7 +5104,10 @@
             saveCachedLyrics(lyricKey(t), {
               v: 3, vr: 3, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
               estimated: !!cur.estimated,
-              voiceAligned: false, voiceRefined: false,
+              voiceAligned: !!cur.voiceAligned, voiceRefined: !!cur.voiceRefined,
+              voiceShift: cur.voiceShift,
+              voiceWords: !!cur.voiceWords,
+              alignedDur: cur.alignedDur,
               fileSig: fileSigOf(t, durSec(t))
             });
           }
@@ -5057,6 +5118,7 @@
           v: 3, vr: 3, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
           estimated: !!cur.estimated,
           voiceAligned: !!cur.voiceAligned, voiceRefined: !!cur.voiceRefined, voiceSnap: !!cur.voiceSnap,
+          voiceShift: cur.voiceShift,
           voiceWords: !!cur.voiceWords,
           alignedDur: cur.alignedDur,
           fileSig: fileSigOf(t, durSec(t))
@@ -5070,7 +5132,9 @@
             const tags = [];
             if (cur.estimated) tags.push('[re:avance aproximado]');
             else if (cur.voiceAligned) tags.push('[re:alineada-voz]');
+            else if (cur.voiceRefined) tags.push('[re:desfase-voz]');
             else tags.push('[re:palabras-voz]');
+            if (cur.voiceRefined && isFinite(+cur.voiceShift)) tags.push('[shift:' + cur.voiceShift + ']');
             if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
             g.saveLrc(fp, tags.join('\n') + '\n' + cur.lines.map(lrcLineText).join('\n')).catch(() => {});
           } catch (e) { }
@@ -5302,7 +5366,19 @@
     }
     const box = $('lyricsBox');
     const el = idx >= 0 ? box.querySelector(`.ly[data-i="${idx}"]`) : null;
-    if (idx === state.lastLyricIdx && !force) { paintWords(el, lines, idx, now); return; }
+    // Si la frase ya terminó y queda un instrumental largo antes de la línea
+    // siguiente, se apaga el resaltado. Antes la última frase se quedaba
+    // encendida (y centrada) 30-45 s y parecía que la letra se había congelado.
+    // Solo se aplica cuando el hueco es largo: en el flujo normal no cambia nada.
+    const lineEnd = idx >= 0 && isFinite(+lines[idx].end) ? +lines[idx].end : 0;
+    const nextLineT = idx >= 0 && lines[idx + 1] ? +lines[idx + 1].t : 0;
+    const longGap = idx >= 0 && lineEnd > 0 && (!nextLineT || nextLineT - lineEnd > 5);
+    const faded = longGap && now > lineEnd + 0.6;
+    if (idx === state.lastLyricIdx && !force) {
+      paintWords(el, lines, idx, now);
+      if (el) el.classList.toggle('on', !faded);
+      return;
+    }
     state.lastLyricIdx = idx;
     if (idx >= 0) {
       dbg('sync t=' + now.toFixed(1) +
@@ -5312,13 +5388,13 @@
     if (prevOn && prevOn !== el) prevOn.classList.remove('on');
     if (idx < 0) return;
     if (el) {
-      el.classList.add('on');
+      if (!faded) el.classList.add('on'); else el.classList.remove('on');
       paintWords(el, lines, idx, now);
       // Centrar la línea activa con scroll animado. Se limita a 2 veces por segundo
       // y solo si el usuario no está interactuando con la lista de letras.
       const userInteracting = box.matches(':hover') || box.dataset.dragging === '1';
       const nowMs = Date.now();
-      if (force || (!userInteracting && (idx !== lastScrollIdx || nowMs - lastScrollAt > 500))) {
+      if (!faded && (force || (!userInteracting && (idx !== lastScrollIdx || nowMs - lastScrollAt > 500)))) {
         lastScrollAt = nowMs; lastScrollIdx = idx;
         const br = box.getBoundingClientRect();
         const er = el.getBoundingClientRect();
@@ -5623,23 +5699,85 @@
   /* ================= Archivos ================= */
   $('btnAddFiles').onclick = () => $('fileAudio').click();
   $('btnAddDir').onclick = () => $('fileDir').click();
+  /* ================= Actualizaciones (manuales) ================= */
+  // Estado del botón "Actualizar":
+  //   idle → checking → available → downloading (NN %) → ready
+  // El punto (badge) aparece en cuanto hay una versión nueva y se queda hasta
+  // que se instala. La barra de progreso se pinta en el borde inferior.
+  const updState = { status: 'idle', version: '', percent: 0 };
+  const updNum = (v) => String(v || '').split(/[.+-]/).slice(0, 3).map(n => parseInt(n, 10) || 0);
+  function updIsNewer(v) {
+    const a = updNum(v), b = updNum(APP_VERSION);
+    for (let i = 0; i < 3; i++) {
+      if (a[i] > b[i]) return true;
+      if (a[i] < b[i]) return false;
+    }
+    return false;
+  }
+  function paintUpdateBtn() {
+    const btn = $('btnUpdate'), label = $('updLabel'), dot = $('updDot');
+    if (!btn) return;
+    const busy = updState.status === 'checking' || updState.status === 'downloading';
+    const has = updState.status === 'available' || updState.status === 'downloading' || updState.status === 'ready';
+    btn.classList.toggle('upd-busy', busy);
+    btn.classList.toggle('has-upd', has);
+    btn.classList.toggle('upd-ready', updState.status === 'ready');
+    btn.style.setProperty('--upd-p', (updState.status === 'downloading' ? updState.percent : 0) + '%');
+    if (label) {
+      label.textContent =
+        updState.status === 'checking' ? 'Buscando…' :
+        updState.status === 'downloading' ? 'Descargando ' + updState.percent + ' %' :
+        updState.status === 'ready' ? (updState.version ? 'Lista v' + updState.version : 'Lista para actualizar') :
+        'Actualizar';
+    }
+    if (dot) dot.style.display = has ? 'block' : 'none';
+    btn.title =
+      updState.status === 'ready' ? 'Actualización v' + updState.version + ' lista · se instala al cerrar la app' :
+      updState.status === 'downloading' ? 'Descargando actualización v' + updState.version + '… ' + updState.percent + ' %' :
+      updState.status === 'available' ? 'Hay una actualización v' + updState.version + ' disponible' :
+      updState.status === 'checking' ? 'Buscando actualizaciones…' :
+      updState.status === 'none' ? 'Ya tienes la última versión' :
+      'Buscar actualizaciones';
+  }
+
   $('btnUpdate').onclick = async () => {
     const g = window.playerAPI;
     if (!g || !g.checkForUpdates) { toast('Actualizaciones no disponibles', 3000); return; }
+    if (updState.status === 'checking' || updState.status === 'downloading') {
+      toast('La actualización se está ' + (updState.status === 'checking' ? 'buscando' : 'descargando') + '…', 2500);
+      return;
+    }
+    if (updState.status === 'ready') {
+      toast('La actualización v' + updState.version + ' se instalará al cerrar la app.', 4000);
+      return;
+    }
+    updState.status = 'checking';
+    updState.percent = 0;
+    paintUpdateBtn();
     toast('Buscando actualizaciones…', 2000);
     try {
       const r = await g.checkForUpdates();
-      if (r && r.ok && r.version) {
+      if (r && r.ok && r.version && updIsNewer(r.version)) {
+        updState.status = 'available';
+        updState.version = r.version;
+        paintUpdateBtn();
         toast('Hay una actualización disponible: v' + r.version + '. Se descargará automáticamente.', 6000);
       } else if (r && r.ok) {
+        updState.status = 'none';
+        paintUpdateBtn();
         toast('Ya tienes la última versión.', 3000);
       } else {
+        updState.status = 'idle';
+        paintUpdateBtn();
         toast('No se pudo comprobar: ' + (r && r.error || 'sin conexión'), 4000);
       }
     } catch (e) {
+      updState.status = 'idle';
+      paintUpdateBtn();
       toast('Error al comprobar actualizaciones', 3000);
     }
   };
+  paintUpdateBtn();
   $('fileAudio').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
   $('fileDir').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
   $('drop').onclick = () => $('fileAudio').click();
@@ -5665,8 +5803,20 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  const APP_VERSION = '2.1.2';
+  let APP_VERSION = '2.2.1';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
+  // La versión real la manda el proceso principal (package.json). Así la
+  // insignia nunca se queda en una versión vieja escrita a mano.
+  try {
+    const vp = window.playerAPI;
+    if (vp && vp.getVersion) {
+      vp.getVersion().then(v => {
+        if (!v) return;
+        APP_VERSION = String(v);
+        const b = $('verBadge'); if (b) b.textContent = 'v' + v;
+      }).catch(() => {});
+    }
+  } catch (e) {}
 
   // Punto del indicador de conexión de la barra superior
   function setNetState(mode) {
@@ -5783,17 +5933,71 @@
   probeConnection();
   setInterval(() => { probeConnection(); }, 60000);
 
-  // Notificar al usuario cuando hay una actualización disponible
+  // Actualizaciones: el botón muestra el progreso y un punto cuando hay una
+  // versión nueva. Todo manual: solo se comprueba/descarga al pulsar "Actualizar".
   const g = window.playerAPI;
+  if (g && g.onUpdateChecking) {
+    g.onUpdateChecking(() => {
+      updState.status = 'checking';
+      updState.percent = 0;
+      paintUpdateBtn();
+    });
+  }
   if (g && g.onUpdateAvailable) {
     g.onUpdateAvailable((version) => {
+      updState.version = version;
+      if (updState.status !== 'downloading' && updState.status !== 'ready') updState.status = 'available';
+      paintUpdateBtn();
       toast('Hay una actualización disponible (v' + version + '). Se descargará en segundo plano.', 6000);
+    });
+  }
+  if (g && g.onUpdateProgress) {
+    g.onUpdateProgress((p) => {
+      updState.percent = Math.max(0, Math.min(100, Math.round(Number(p && p.percent) || 0)));
+      updState.status = 'downloading';
+      paintUpdateBtn();
     });
   }
   if (g && g.onUpdateDownloaded) {
     g.onUpdateDownloaded((version) => {
+      updState.version = version;
+      updState.percent = 100;
+      updState.status = 'ready';
+      paintUpdateBtn();
       toast('Actualización v' + version + ' lista. Se instalará al cerrar la app.', 8000);
     });
+  }
+  if (g && g.onUpdateNotAvailable) {
+    g.onUpdateNotAvailable(() => {
+      if (updState.status === 'checking' || updState.status === 'available') {
+        updState.status = 'none';
+        updState.percent = 0;
+        paintUpdateBtn();
+      }
+    });
+  }
+  if (g && g.onUpdateError) {
+    g.onUpdateError((msg) => {
+      if (updState.status === 'checking' || updState.status === 'downloading') {
+        updState.status = 'idle';
+        paintUpdateBtn();
+      }
+    });
+  }
+  // Aviso silencioso al abrir la app: se consulta (solo consulta, sin descargar)
+  // cuál es la última versión publicada y, si es más nueva, se enciende el punto
+  // del botón "Actualizar". La descarga NO empieza hasta que el usuario pulsa.
+  if (g && g.latestVersion) {
+    setTimeout(() => {
+      g.latestVersion().then(r => {
+        if (!r || !r.ok || !r.version) return;
+        if (!updIsNewer(r.version)) return;
+        if (updState.status === 'checking' || updState.status === 'downloading' || updState.status === 'ready') return;
+        updState.version = r.version;
+        updState.status = 'available';
+        paintUpdateBtn();
+      }).catch(() => {});
+    }, 1500);
   }
   window.addEventListener('beforeunload', () => {
     savePlaylist();                     // guardado final al salir

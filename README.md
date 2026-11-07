@@ -17,6 +17,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Verificación de letra correcta (idioma, artista, similitud)
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
+- El botón Actualizar muestra el progreso de la descarga y un punto cuando hay una versión nueva
 
 ## Instalación
 
