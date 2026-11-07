@@ -6,23 +6,24 @@ Reproductor de música para Windows con sincronización automática de letras.
 
 [⬇️ Descargar última versión](https://github.com/isaac117q/reproductor-musica/releases/latest)
 
-El instalador se descarga automáticamente y la app se actualiza sola al abrirse.
+El instalador está siempre en [Releases](https://github.com/isaac117q/reproductor-musica/releases/latest). Cuando exista una versión nueva, la app lo avisa y se actualiza con el botón **Actualizar** (las actualizaciones son manuales, no se instalan solas).
 
 ## Características
 
 - Reproducción de audio con letras sincronizadas
 - Búsqueda automática de letras (lrclib, letras.com, lyrics.ovh)
 - Sincronización automática con la voz (análisis de audio)
+- Las letras LRC resaltan palabra por palabra siguiendo la voz del cantante
 - Verificación de letra correcta (idioma, artista, similitud)
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
-- Actualizaciones automáticas
+- Actualizaciones manuales desde el botón Actualizar
 
 ## Instalación
 
 1. Descarga el instalador desde [Releases](https://github.com/isaac117q/reproductor-musica/releases/latest)
 2. Ejecuta el instalador
 3. La app se instala en C:\Users\<usuario>\AppData\Local\Programs\reproductor-musica\
-4. Las actualizaciones se descargan e instalan automáticamente
+4. Cuando haya una versión nueva, usa el botón **Actualizar** de la app
 
 ## Uso
 
