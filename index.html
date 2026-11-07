@@ -373,26 +373,39 @@
     animation: lyEnter .44s cubic-bezier(.22,1,.36,1) both;
     animation-delay: calc(var(--i, 0) * 18ms);
   }
-  /* Palabras pre-renderizadas: transición suave sin saltos de línea ni de espacio */
+  /* Palabras pre-renderizadas: transición suave vinculada a la voz (--wp + --voice) */
   .ly .w {
     display: inline-block;
-    transition: opacity .34s cubic-bezier(.22,1,.36,1), transform .34s cubic-bezier(.22,1,.36,1), color .3s ease, background-color .3s ease, box-shadow .32s ease, filter .3s ease;
+    position: relative;
+    transition: opacity .32s cubic-bezier(.22,1,.36,1), transform .28s cubic-bezier(.22,1,.36,1), color .28s ease, background-color .28s ease, box-shadow .3s ease, filter .28s ease;
     will-change: transform, opacity;
   }
-  /* Resaltado palabra por palabra: cada palabra se enciende cuando empieza a cantarse */
+  /* En la línea activa, cada estilo define --w-fill (color cantado) y --w-unlit (color aún no cantado) */
+  .ly.on {
+    --w-fill: var(--text);
+    --w-unlit: color-mix(in srgb, var(--ly) 58%, transparent);
+    color: var(--text);
+    transform: translateX(3px) scale(1.03);
+  }
+  /* Palabras de la línea activa que AÚN NO se han cantado: esperan a la voz */
   .ly.on .w {
-    opacity: .52;
+    color: var(--w-unlit);
+    opacity: .62;
     transform: translateY(0) scale(1);
   }
-  .ly.on .w.done { opacity: 1; transform: translateY(0) scale(1); }
-  /* Palabra que se está cantando: se rellena de forma progresiva con borde suave (efecto
-     karaoke fluido). --wp lo actualiza paintWords() en cada fotograma a 60 fps. */
+  /* Palabras YA cantadas: encendidas con el color/efecto del estilo activo */
+  .ly.on .w.done {
+    color: var(--w-fill);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  /* Palabra que se está cantando AHORA MISMO: barrido progresivo (--wp) + pulso de voz en vivo (--voice) */
   .ly.on .w.cur {
     opacity: 1;
-    transform: translateY(-1.5px) scale(1.03);
+    transform: translateY(calc(-1.5px - var(--voice, 0) * 1.8px)) scale(calc(1.03 + var(--voice, 0) * 0.025));
     background-image: linear-gradient(90deg,
-      var(--text) calc(var(--wp, 100%) - 7%),
-      color-mix(in srgb, var(--ly) 55%, transparent) calc(var(--wp, 100%) + 7%));
+      var(--w-fill) calc(var(--wp, 100%) - 6%),
+      var(--w-unlit) calc(var(--wp, 100%) + 6%));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -416,7 +429,6 @@
     transform-origin: left center; cursor: pointer;
   }
   .ly:hover { color: var(--ly-hover); transform: translateX(4px); }
-  .ly.on { color: var(--text); transform: translateX(3px) scale(1.03); }
   /* Líneas inactivas más tenues: el paso de una línea a otra se ve fluido */
   .lyrics .ly:not(.on):not(.head):not(.dim):not(:hover) { opacity: .66; }
   .ly.head { font-size: 13px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; color: var(--muted); margin-bottom: -4px; }
@@ -2109,7 +2121,7 @@
   /* --- Animación compartida: flotación suave de las portadas circulares --- */
   @keyframes stFloatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 
-  /* ---------- Estilos de las letras (transiciones fluidas sin saltos de tamaño) ---------- */
+  /* ---------- Estilos de las letras (los 16 estilos vinculados a la voz palabra por palabra) ---------- */
   body[data-ly="grande"] .lyrics { gap: 21px; }
   body[data-ly="grande"] .ly { font-size: 31px; font-weight: 780; line-height: 1.34; }
   body[data-ly="grande"] .ly.on { transform: translateX(4px) scale(1.035); }
@@ -2117,12 +2129,17 @@
 
   body[data-ly="karaoke"] .ly {
     font-size: 25px; font-weight: 780; letter-spacing: -.4px;
-    text-shadow: 0 0 0 transparent;
   }
   body[data-ly="karaoke"] .ly.on {
+    --w-fill: var(--accent);
     color: var(--accent);
     transform: translateX(4px) scale(1.045);
-    text-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+  body[data-ly="karaoke"] .ly.on .w.done {
+    text-shadow: 0 3px 16px color-mix(in srgb, var(--accent) 34%, transparent);
+  }
+  body[data-ly="karaoke"] .ly.on .w.cur {
+    filter: drop-shadow(0 2px calc(6px + var(--voice, 0) * 10px) color-mix(in srgb, var(--accent) 45%, transparent));
   }
   body[data-ly="karaoke"] .ly:hover { color: var(--accent); opacity: .82; transform: translateX(4px); }
 
@@ -2130,7 +2147,11 @@
     font-family: Georgia, "Times New Roman", serif;
     font-style: italic; font-weight: 600; font-size: 24.5px; letter-spacing: 0;
   }
-  body[data-ly="clasico"] .ly.on { color: var(--accent); transform: translateX(5px) scale(1.03); }
+  body[data-ly="clasico"] .ly.on {
+    --w-fill: var(--accent);
+    color: var(--accent);
+    transform: translateX(5px) scale(1.03);
+  }
   body[data-ly="clasico"] .ly.head { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-style: normal; }
 
   body[data-ly="compacto"] .lyrics { gap: 11px; }
@@ -2145,6 +2166,7 @@
     box-shadow: 0 0 0 rgba(20,24,60,0);
   }
   body[data-ly="marcador"] .ly.on {
+    --w-fill: var(--accent);
     color: var(--accent); background-color: var(--accent-soft);
     box-shadow: 0 8px 22px rgba(20,24,60,.12);
     transform: translateX(4px) scale(1.02);
@@ -2153,20 +2175,31 @@
 
   body[data-ly="subrayado"] .ly {
     font-size: 24px; font-weight: 700;
-    text-decoration: underline;
-    text-decoration-color: transparent;
-    text-decoration-thickness: 3.5px;
-    text-underline-offset: 9px;
   }
   body[data-ly="subrayado"] .ly.on {
+    --w-fill: var(--text);
     color: var(--text);
-    text-decoration-color: var(--accent);
-    text-underline-offset: 6px;
     transform: translateX(4px) scale(1.025);
+  }
+  /* El subrayado avanza palabra por palabra con la voz (--wp) */
+  body[data-ly="subrayado"] .ly.on .w::after {
+    content: "";
+    position: absolute; left: 0; bottom: -3px;
+    height: 3.5px; width: 0%;
+    border-radius: 99px;
+    background: var(--accent);
+    transition: width .08s linear;
+  }
+  body[data-ly="subrayado"] .ly.on .w.cur::after {
+    width: var(--wp, 100%);
+    box-shadow: 0 0 calc(4px + var(--voice, 0) * 8px) var(--accent);
+  }
+  body[data-ly="subrayado"] .ly.on .w.done::after {
+    width: 100%;
   }
 
   body[data-ly="mono"] .ly { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 21px; font-weight: 600; letter-spacing: 0; }
-  body[data-ly="mono"] .ly.on { color: var(--accent); transform: translateX(5px) scale(1.025); }
+  body[data-ly="mono"] .ly.on { --w-fill: var(--accent); color: var(--accent); transform: translateX(5px) scale(1.025); }
   body[data-ly="mono"] .ly.head { font-family: "Cascadia Mono", Consolas, monospace; }
 
   /* ---------- Estilos de letra añadidos en 1.5.0 ---------- */
@@ -2178,23 +2211,36 @@
   body[data-ly="enfoque"] .ly.on {
     filter: blur(0px); opacity: 1; transform: translateX(4px) scale(1.055);
   }
+  /* En enfoque, las palabras aún no cantadas tienen un leve desenfoque que se limpia al cantarlas */
+  body[data-ly="enfoque"] .ly.on .w:not(.done):not(.cur) { filter: blur(.6px); opacity: .48; }
+  body[data-ly="enfoque"] .ly.on .w.cur,
+  body[data-ly="enfoque"] .ly.on .w.done { filter: blur(0px); }
   body[data-ly="enfoque"] .ly.head,
   body[data-ly="enfoque"] .ly.dim,
   body[data-ly="enfoque"] .ly-note { filter: none; opacity: 1; transform: none; }
 
+  /* Neón: cada palabra enciende su tubo neón cuando la voz la canta (no toda la línea de golpe) */
   body[data-ly="neon"] .ly {
     font-weight: 800;
-    text-shadow: 0 0 0 transparent, 0 0 0 transparent, 0 0 0 transparent;
   }
   body[data-ly="neon"] .ly.on {
+    --w-fill: var(--text);
     color: var(--text);
     transform: translateX(4px) scale(1.035);
+  }
+  body[data-ly="neon"] .ly.on .w.cur {
+    filter:
+      drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 90%, #fff))
+      drop-shadow(0 0 calc(8px + var(--voice, 0) * 12px) color-mix(in srgb, var(--accent) 75%, transparent));
+  }
+  body[data-ly="neon"] .ly.on .w.done {
     text-shadow:
       0 0 3px color-mix(in srgb, var(--accent) 90%, #fff),
-      0 0 16px color-mix(in srgb, var(--accent) 68%, transparent),
-      0 0 34px color-mix(in srgb, var(--accent) 44%, transparent);
+      0 0 14px color-mix(in srgb, var(--accent) 68%, transparent),
+      0 0 30px color-mix(in srgb, var(--accent) 44%, transparent);
   }
 
+  /* Gradiente: el degradado avanza palabra por palabra con la voz (--wp) */
   body[data-ly="gradiente"] .ly {
     font-weight: 800; letter-spacing: -.55px;
   }
@@ -2202,21 +2248,25 @@
     color: var(--text); background: none;
     transform: translateX(4px) scale(1.035);
   }
-  /* El gradiente se aplica a cada palabra (no a la línea entera): así las
-     palabras completadas no quedan invisibles por heredar color transparente. */
-  body[data-ly="gradiente"] .ly.on .w {
+  body[data-ly="gradiente"] .ly.on .w:not(.done):not(.cur) {
+    background: none;
+    color: var(--w-unlit);
+    -webkit-text-fill-color: var(--w-unlit);
+  }
+  body[data-ly="gradiente"] .ly.on .w.done {
+    opacity: 1;
     background-image: linear-gradient(92deg, var(--accent), var(--viz2));
     -webkit-background-clip: text; background-clip: text;
     color: transparent; -webkit-text-fill-color: transparent;
   }
-  body[data-ly="gradiente"] .ly.on .w.done { opacity: 1; }
   body[data-ly="gradiente"] .ly.on .w.cur {
     opacity: 1;
     background-image: linear-gradient(90deg,
-      var(--text) calc(var(--wp, 100%) - 7%),
-      color-mix(in srgb, var(--accent) 55%, transparent) calc(var(--wp, 100%) + 7%));
+      var(--accent) 0%,
+      var(--viz2) calc(var(--wp, 100%) - 6%),
+      var(--w-unlit) calc(var(--wp, 100%) + 6%));
     -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: transparent; -webkit-text-fill-color: transparent;
   }
 
   body[data-ly="cinta"] .ly {
@@ -2226,28 +2276,49 @@
     background-size: 0% 100%; background-repeat: no-repeat;
   }
   body[data-ly="cinta"] .ly.on {
+    --w-fill: var(--text);
     border-left-color: var(--accent);
     background-size: 100% 100%;
     transform: translateX(4px);
   }
 
+  /* Contorno: las palabras no cantadas son contorno hueco y se rellenan por dentro al cantarlas */
   body[data-ly="contorno"] .ly {
     font-weight: 830; letter-spacing: -.5px;
     -webkit-text-stroke: 1.2px transparent;
   }
   body[data-ly="contorno"] .ly.on {
-    color: transparent; -webkit-text-stroke-color: var(--accent);
     transform: translateX(4px) scale(1.03);
   }
+  body[data-ly="contorno"] .ly.on .w:not(.done):not(.cur) {
+    color: transparent; -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 1.2px color-mix(in srgb, var(--accent) 62%, transparent);
+    opacity: .78;
+  }
+  body[data-ly="contorno"] .ly.on .w.cur {
+    opacity: 1;
+    -webkit-text-stroke: 1.2px var(--accent);
+    background-image: linear-gradient(90deg,
+      var(--accent) calc(var(--wp, 100%) - 6%),
+      transparent calc(var(--wp, 100%) + 6%));
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+  }
+  body[data-ly="contorno"] .ly.on .w.done {
+    opacity: 1;
+    -webkit-text-stroke: 1.2px var(--accent);
+    color: var(--accent); -webkit-text-fill-color: var(--accent);
+  }
 
+  /* Máquina de escribir: el cursor ▍ avanza en la palabra que se está cantando */
   body[data-ly="typewriter"] .ly {
     font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
     font-size: 20px; font-weight: 600; letter-spacing: 0; line-height: 1.45;
   }
-  body[data-ly="typewriter"] .ly.on { transform: translateX(4px); }
-  body[data-ly="typewriter"] .ly.on::after {
-    content: "▍"; color: var(--accent); margin-left: 3px;
-    animation: caret 1.05s steps(1) infinite;
+  body[data-ly="typewriter"] .ly.on { --w-fill: var(--accent); transform: translateX(4px); }
+  body[data-ly="typewriter"] .ly.on .w.cur::after {
+    content: "▍"; color: var(--accent); -webkit-text-fill-color: var(--accent); margin-left: 2px;
+    animation: caret .9s steps(1) infinite;
   }
   body[data-ly="typewriter"] .ly.head { font-family: inherit; }
   @keyframes caret { 50% { opacity: 0; } }
@@ -2257,34 +2328,39 @@
     font-size: 24px; font-weight: 600; letter-spacing: 0; line-height: 1.45;
   }
   body[data-ly="manuscrito"] .ly.on {
+    --w-fill: var(--accent);
     color: var(--accent); transform: translateX(4px) rotate(-1deg) scale(1.03); transform-origin: left center;
   }
   body[data-ly="manuscrito"] .ly.head { font-family: inherit; }
 
+  /* Palabra: la pastilla se llena progresivamente con la voz (--wp) y pulsa con --voice */
   body[data-ly="palabra"] .ly .w {
     padding: 1px 6px; margin: -1px -3px; border-radius: 7px;
     background-color: transparent;
     box-shadow: 0 0 0 0 transparent;
     transition:
-      color .32s cubic-bezier(.22,1,.36,1),
-      background-color .32s cubic-bezier(.22,1,.36,1),
-      box-shadow .34s cubic-bezier(.22,1,.36,1),
-      transform .34s cubic-bezier(.22,1,.36,1),
-      opacity .32s ease;
+      color .28s cubic-bezier(.22,1,.36,1),
+      background-color .28s cubic-bezier(.22,1,.36,1),
+      box-shadow .3s cubic-bezier(.22,1,.36,1),
+      transform .28s cubic-bezier(.22,1,.36,1),
+      opacity .28s ease;
   }
   body[data-ly="palabra"] .ly.on { color: var(--ly-hover); transform: translateX(3px) scale(1.02); }
-  body[data-ly="palabra"] .ly.on .w { opacity: .72; }
-  body[data-ly="palabra"] .ly.on .w.done { opacity: 1; color: var(--text); transform: translateY(0) scale(1); }
+  body[data-ly="palabra"] .ly.on .w { opacity: .68; color: var(--w-unlit); }
+  body[data-ly="palabra"] .ly.on .w.done {
+    opacity: 1; color: var(--accent); -webkit-text-fill-color: var(--accent);
+    background-color: var(--accent-soft);
+    transform: translateY(0) scale(1);
+  }
   body[data-ly="palabra"] .ly.on .w.cur {
     opacity: 1;
-    color: var(--bg); background-color: var(--accent);
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 38%, transparent);
-    transform: translateY(-2px) scale(1.05);
-    /* El resaltado karaoke base deja la palabra con relleno transparente y
-       recorte de fondo; este estilo pinta la palabra entera de un color. */
-    background-image: none;
+    color: var(--bg); -webkit-text-fill-color: var(--bg);
+    background-image: linear-gradient(90deg,
+      var(--accent) calc(var(--wp, 100%) - 6%),
+      color-mix(in srgb, var(--accent) 28%, transparent) calc(var(--wp, 100%) + 6%));
     -webkit-background-clip: border-box; background-clip: border-box;
-    -webkit-text-fill-color: var(--bg);
+    box-shadow: 0 4px calc(12px + var(--voice, 0) * 10px) color-mix(in srgb, var(--accent) 42%, transparent);
+    transform: translateY(calc(-2px - var(--voice, 0) * 1.5px)) scale(calc(1.05 + var(--voice, 0) * 0.025));
   }
 
   /* ---------- Selector de tema y estilo (pestaña "Tema") ---------- */
@@ -2387,7 +2463,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.2.9</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.0</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -3464,7 +3540,7 @@
   }
   refreshVizCols();
   const smoothBins = new Float32Array(40);
-  let smoothBass = 0;
+  let smoothBass = 0, smoothVoice = 0;
   (function draw() {
     requestAnimationFrame(draw);
     const dpr = devicePixelRatio || 1;
@@ -3472,7 +3548,7 @@
     const h = canvas.height = canvas.clientHeight * dpr;
     cx.clearRect(0, 0, w, h);
     const bars = 40;
-    let bass = 0;
+    let bass = 0, voiceSum = 0, voiceCnt = 0;
     if (analyser && dataArr && !media.paused) {
       analyser.getByteFrequencyData(dataArr);
     } else if (dataArr) {
@@ -3486,6 +3562,8 @@
       smoothBins[i] += (raw - smoothBins[i]) * rate;
       const v = smoothBins[i];
       if (i < 6) bass += v;
+      // Banda vocal humana (~300 Hz - 3400 Hz): impulsa el realce de los 16 estilos de letra en vivo
+      if (i >= 4 && i <= 22) { voiceSum += v; voiceCnt++; }
       const bh = Math.max(3 * dpr, v * h * .96);
       const x = i * (bw + gap);
       cx.fillStyle = vizCols[i % 3];
@@ -3496,7 +3574,20 @@
     cx.globalAlpha = 1;
     const targetBass = bass / 6;
     smoothBass += (targetBass - smoothBass) * (targetBass > smoothBass ? 0.35 : 0.14);
+    let targetVoice = voiceCnt ? (voiceSum / voiceCnt) : 0;
+    // Respaldo con las frases vocales analizadas del archivo si el grafo WebAudio aún no está activo
+    if (targetVoice < 0.05 && !media.paused) {
+      const tr = state.tracks[state.index];
+      const phs = tr && tr.voiceData && tr.voiceData.phrases;
+      const nowT = media.currentTime || 0;
+      if (Array.isArray(phs)) {
+        const ph = phs.find(p => nowT >= p.t - 0.08 && nowT <= p.end + 0.08);
+        if (ph) targetVoice = Math.min(1, Math.max(0.35, Number(ph.eff) || 0.65));
+      }
+    }
+    smoothVoice += (targetVoice - smoothVoice) * (targetVoice > smoothVoice ? 0.45 : 0.18);
     document.documentElement.style.setProperty('--bass', smoothBass.toFixed(3));
+    document.documentElement.style.setProperty('--voice', smoothVoice.toFixed(3));
   })();
 
   /* ================= Letras (lrclib.net) ================= */
@@ -3519,10 +3610,11 @@
       const stamps = [...raw.matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.,:]\d{1,3})?)\]/g)];
       if (!stamps.length) continue;
       const content = raw.replace(/\[[^\]]*\]/g, '');
-      // Marcas de palabra del LRC enriquecido: [00:12.30]<00:12.30>Hola <00:12.80>mundo
+      // Marcas de palabra del LRC enriquecido: [00:12.30]<00:12.30>Hola <00:12.80>mundo<00:13.40>
       const marks = [...content.matchAll(/<(\d{1,3}):(\d{1,2}(?:[.,:]\d{1,3})?)>/g)];
       let text = '';
       let words = null;
+      let lineEnd = null;
       if (marks.length > 1) {
         words = [];
         for (let k = 0; k < marks.length; k++) {
@@ -3531,7 +3623,9 @@
           const b = k + 1 < marks.length ? marks[k + 1].index : content.length;
           const wt = content.slice(a, b).replace(/<[^>]*>/g, '').trim();
           const tm = secOf(mk[1], mk[2]);
-          if (!wt || tm === null) continue;
+          if (tm === null) continue;
+          if (!wt && k === marks.length - 1) { lineEnd = tm; continue; }
+          if (!wt) continue;
           words.push({ t: tm, text: wt });
         }
         if (words.length > 1) text = words.map(w => w.text).join(' ');
@@ -3544,6 +3638,7 @@
         if (t === null) continue;
         const row = { t, text };
         if (words) row.words = words;
+        if (lineEnd !== null && lineEnd > t) row.end = lineEnd;
         rows.push(row);
       }
     }
@@ -3568,20 +3663,21 @@
   }
 
   // Línea de LRC con marcas por palabra cuando ya se conocen sus tiempos.
-  // Formato enriquecido: [00:32.43]<00:32.43>Juan <00:32.96>Magán
+  // Formato enriquecido: [00:32.43]<00:32.43>Juan <00:32.96>Magán<00:33.50>
   function lrcLineText(l) {
-    const sec = Math.max(0, Number(l && l.t) || 0);
-    const m = Math.floor(sec / 60);
-    const s = (sec % 60).toFixed(2).padStart(5, '0');
-    const pre = '[' + String(m).padStart(2, '0') + ':' + s + ']';
-    if (!l || !Array.isArray(l.words) || l.words.length < 2) return pre + ((l && l.text) || '');
-    return pre + l.words.map(w => {
-      const ws = Math.max(0, Number(w.t) || 0);
+    const fmtTag = (val) => {
+      const ws = Math.max(0, Number(val) || 0);
       const wm = Math.floor(ws / 60);
       const wss = (ws % 60).toFixed(2).padStart(5, '0');
-      return '<' + String(wm).padStart(2, '0') + ':' + wss + '>' +
-        String(w.text || '').replace(/[<>\[\]]/g, '') + ' ';
-    }).join('').trimEnd();
+      return String(wm).padStart(2, '0') + ':' + wss;
+    };
+    const pre = '[' + fmtTag(l && l.t) + ']';
+    if (!l || !Array.isArray(l.words) || l.words.length < 2) return pre + ((l && l.text) || '');
+    const wtxt = l.words.map(w =>
+      '<' + fmtTag(w.t) + '>' + String(w.text || '').replace(/[<>\[\]]/g, '') + ' '
+    ).join('').trimEnd();
+    const endTag = (isFinite(+l.end) && +l.end > +l.t) ? '<' + fmtTag(l.end) + '>' : '';
+    return pre + wtxt + endTag;
   }
 
   // Detecta un LRC "aproximado": las marcas se repartieron de forma proporcional
@@ -5429,12 +5525,33 @@
     const verdict = pct < 65 ? 'bad'
       : (ad >= 0.4 || pct < 85) ? 'warn'
       : 'ok';
+
+    // Analizador de sincronía de palabras y estilos de letra con la voz:
+    // comprueba cuántas líneas y palabras tienen tiempos anclados a ataques
+    // vocales reales para que los 16 estilos avancen con el cantante.
+    let wordLines = 0, wordsTotal = 0, wordsInVoice = 0;
+    for (const l of lines) {
+      if (Array.isArray(l.words) && l.words.length > 1) {
+        wordLines++;
+        for (const w of l.words) {
+          if (!w || !isFinite(+w.t)) continue;
+          wordsTotal++;
+          if (phrases.some(p => +w.t >= p.t - 0.55 && +w.t <= p.end + 0.55)) wordsInVoice++;
+        }
+      }
+    }
+    const wordPct = wordsTotal ? Math.round(wordsInVoice * 100 / wordsTotal) : pct;
+
     return {
       pct,
       total: lines.length,
       matched,
       offset,
-      verdict
+      verdict,
+      wordLines,
+      wordsTotal,
+      wordPct,
+      styleSynced: true
     };
   }
 
@@ -5449,17 +5566,23 @@
     if (!t || state.tracks[state.index] !== t) return;
     const L = t.lyrics;
     if (!L || L.type === 'none' || L.type === 'credits') return;
-    // ¿La letra ya trae tiempos por palabra (propias o puestas por una versión
-    // anterior)? Si no, conviene analizar la voz aunque la línea ya esté pegada.
-    const hasVoiceWords = (X) => !!(X && (X.voiceWords ||
-      (Array.isArray(X.lines) && X.lines.some(l => Array.isArray(l.words) && l.words.length > 1))));
-    // Si ya se analizó este mismo archivo y se midió la sincronía, no repetir.
-    // El indicador vive en la letra, así que basta con tenerlo guardado.
+    // ¿La letra ya trae tiempos por palabra en al menos la mitad de sus líneas?
+    // Si no, conviene analizar la voz aunque la línea ya esté medida, para que
+    // todos los estilos de letra avancen palabra por palabra con el cantante.
+    const hasVoiceWords = (X) => {
+      if (!X || !Array.isArray(X.lines) || !X.lines.length) return false;
+      const multi = X.lines.filter(l => l && String(l.text || '').trim().split(/\s+/).length > 1);
+      if (!multi.length) return true;
+      const withWords = multi.filter(l => Array.isArray(l.words) && l.words.length > 1);
+      return withWords.length >= Math.max(1, Math.floor(multi.length * 0.45));
+    };
+    // Si ya se analizó este mismo archivo, se midió la sincronía Y tiene palabras
+    // pegadas a la voz, no repetir.
     const curFileSig = fileSigOf(t, durSec(t));
     const durNow = durSec(t);
-    if ((L.syncInfo || L.syncNA) && curFileSig && L.fileSig === curFileSig) return;
-    // .lrc del disco ya medido para esta misma duración: tampoco se repite.
-    if (L.syncInfo && isFinite(L.alignedDur) && durNow &&
+    if ((L.syncInfo || L.syncNA) && hasVoiceWords(L) && curFileSig && L.fileSig === curFileSig) return;
+    // .lrc del disco ya medido y con marcas de palabra para esta misma duración: tampoco se repite.
+    if (L.syncInfo && hasVoiceWords(L) && isFinite(L.alignedDur) && durNow &&
         Math.abs(L.alignedDur - durNow) <= 2) {
       L.fileSig = curFileSig;
       return;
@@ -5484,6 +5607,7 @@
           new Promise(res => setTimeout(() => res(null), 30000))
         ]);
         if (!A) { t._voiceSkipUntil = Date.now() + 120000; dbg('análisis de voz: tiempo agotado'); return; }
+        t.voiceData = A;
         if (!A || !A.phrases || !A.phrases.length) {
           t._voiceSkipUntil = Date.now() + 120000;      // audio no analizable
           // Sin voz detectable no se puede medir: el indicador lo dice en vez de
@@ -5676,15 +5800,17 @@
         det.push('Medición orientativa: ' + (+s.matched) + ' de ' + (+s.total) +
           ' líneas caen junto a una frase vocal.');
       }
+      const curLyStyle = (document.body && document.body.dataset && document.body.dataset.ly) || 'minimal';
+      det.push('Estilo «' + curLyStyle + '» vinculado palabra por palabra a la voz y a la letra.');
       return '<span class="ly-sync warn" title="' + esc(det.join(' · ')) + '">' +
-        '<i class="dot"></i>' + (L.estimated && !L.voiceAligned ? 'Avance aproximado' : 'Ajuste automático') +
+        '<i class="dot"></i>' + (L.estimated && !L.voiceAligned ? 'Avance aproximado · estilo con voz' : 'Ajuste automático · estilo con voz') +
         '</span>';
     }
     // El audio no dio frases vocales suficientes: se informa en vez de dejar la
     // cabecera sin indicador (parecía que el analizador no funcionaba).
     if (L && L.syncNA && (!s || !isFinite(+s.pct))) {
-      return '<span class="ly-sync na" title="No se pudo medir la voz en esta canción; la letra se muestra igual">' +
-        '<i class="dot"></i>Sin datos de voz</span>';
+      return '<span class="ly-sync na" title="No se pudo medir la voz en esta canción; el estilo avanza con los tiempos de la letra">' +
+        '<i class="dot"></i>Sin datos de voz · estilo con letra</span>';
     }
     if (!s || !isFinite(+s.pct)) return '';
     const pct = Math.max(0, Math.min(100, Math.round(+s.pct)));
@@ -5695,12 +5821,17 @@
     else if (Math.abs(off) >= 0.4) {
       txt = (off > 0 ? 'Va atrasada ' : 'Va adelantada ') + Math.abs(off).toFixed(1) + ' s';
     } else {
-      txt = 'Sincronía ' + pct + ' %';
+      txt = 'Sincronía ' + pct + ' % · estilo y voz';
     }
     const det = [];
     if (isFinite(+s.matched) && isFinite(+s.total)) {
       det.push(+s.matched + ' de ' + +s.total + ' líneas empiezan junto a la voz (±0.5 s)');
     }
+    if (isFinite(+s.wordsTotal) && +s.wordsTotal > 0) {
+      det.push(+s.wordsTotal + ' palabras sincronizadas con ataques vocales (' + (+s.wordPct || pct) + ' % en voz)');
+    }
+    const curLyStyle2 = (document.body && document.body.dataset && document.body.dataset.ly) || 'minimal';
+    det.push('Estilo «' + curLyStyle2 + '» sincronizado en tiempo real con la voz y la letra');
     if (Math.abs(off) >= 0.4) {
       det.push('Desfase estimado ' + (off > 0 ? '+' : '') + off.toFixed(1) + ' s: la letra va ' +
         (off > 0 ? 'atrasada' : 'adelantada'));
@@ -5780,7 +5911,7 @@
       L.lines.map((ln, i) => {
         const nextT = L.lines[i + 1] ? +L.lines[i + 1].t : 0;
         const times = wordTimings(ln, nextT);
-        const wkey = times.length ? times.map(w => w.text).join('\u0001') : '';
+        const wkey = times.length ? times.map(w => w.text + ':' + w.t.toFixed(2)).join('\u0001') : '';
         const bodyHtml = times.length
           ? times.map(w => `<span class="w">${esc(w.text)}</span>`).join(' ')
           : esc(ln.text);
@@ -5840,7 +5971,7 @@
     const nextT = lines[idx + 1] ? +lines[idx + 1].t : 0;
     const times = wordTimings(line, nextT);
     if (!times.length) return;
-    const key = times.map(w => w.text).join('\u0001');
+    const key = times.map(w => w.text + ':' + w.t.toFixed(2)).join('\u0001');
     if (el.dataset.wkey !== key) {
       el.innerHTML = times.map(w => `<span class="w">${esc(w.text)}</span>`).join(' ');
       el.dataset.wkey = key;
@@ -6065,7 +6196,7 @@
     b.onclick = () => {
       try { localStorage.setItem('rp-ly', b.dataset.v); } catch (e) {}
       applyLook();
-      syncLyrics(true);
+      renderLyrics();
       dbg('estilo de letras cambiado a "' + b.dataset.v + '"');
       toast('Estilo de letras: ' + b.querySelector('b').textContent);
     };
@@ -6372,7 +6503,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.2.9';
+  let APP_VERSION = '2.3.0';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
