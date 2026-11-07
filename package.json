@@ -41,7 +41,12 @@
           ]
         }
       ],
-      "artifactName": "ReproductorMusica-${version}-Setup.${ext}"
+      "artifactName": "ReproductorMusica-${version}-Setup.${ext}",
+      "signtoolOptions": {
+        "certificateFile": "./certificado.pfx",
+        "certificatePassword": "isaac117@",
+        "signingHashAlgorithms": ["sha256"]
+      }
     },
     "nsis": {
       "oneClick": false,
