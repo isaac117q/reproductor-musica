@@ -38,12 +38,7 @@ El instalador se descarga automáticamente y la app se actualiza sola al abrirse
 
 ## Desarrollo
 
-`ash
-npm install
-npm start          # modo desarrollo
-npm run dist       # compilar instalador
-npm run dist -- --publish always  # compilar y publicar en GitHub Releases
-`
+
 
 ## Licencia
 
