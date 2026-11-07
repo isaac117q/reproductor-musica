@@ -3319,8 +3319,26 @@
     // alineó con la voz, sin volver a analizar el audio en cada reproducción.
     out.estimated = /\[re:[^\]]*aproximad[^\]]*\]/i.test(rawText) || looksEstimatedTimes(out);
     out.voiceAligned = /\[re:[^\]]*alineada[^\]]*\]/i.test(rawText);
+    out.voiceWords = /\[re:[^\]]*palabras[^\]]*\]/i.test(rawText);
     if (lm && isFinite(+lm[1])) out.alignedDur = +lm[1];
     return out;
+  }
+
+  // Línea de LRC con marcas por palabra cuando ya se conocen sus tiempos.
+  // Formato enriquecido: [00:32.43]<00:32.43>Juan <00:32.96>Magán
+  function lrcLineText(l) {
+    const sec = Math.max(0, Number(l && l.t) || 0);
+    const m = Math.floor(sec / 60);
+    const s = (sec % 60).toFixed(2).padStart(5, '0');
+    const pre = '[' + String(m).padStart(2, '0') + ':' + s + ']';
+    if (!l || !Array.isArray(l.words) || l.words.length < 2) return pre + ((l && l.text) || '');
+    return pre + l.words.map(w => {
+      const ws = Math.max(0, Number(w.t) || 0);
+      const wm = Math.floor(ws / 60);
+      const wss = (ws % 60).toFixed(2).padStart(5, '0');
+      return '<' + String(wm).padStart(2, '0') + ':' + wss + '>' +
+        String(w.text || '').replace(/[<>\[\]]/g, '') + ' ';
+    }).join('').trimEnd();
   }
 
   // Detecta un LRC "aproximado": las marcas se repartieron de forma proporcional
@@ -3423,6 +3441,7 @@
     const extra = {
       dur: d.dur, estimated: d.estimated, vr: d.vr, verified: d.verified,
       voiceAligned: d.voiceAligned, voiceRefined: d.voiceRefined, voiceSnap: d.voiceSnap,
+      voiceWords: d.voiceWords,
       fileSig: d.fileSig, alignedDur: d.alignedDur
     };
     if (Array.isArray(d.lines) && d.lines.length) return { type: 'synced', lines: d.lines, source: d.source, ...extra };
@@ -3440,7 +3459,7 @@
     // Las letras refinadas por algoritmos antiguos pueden traer un desplazamiento
     // falso grabado (incluidos los "ajustes finos" línea a línea que estropeaban
     // letras correctas): se descartan y se revalidan contra la voz.
-    const refinVieja = (d) => !!(d && (d.voiceRefined || d.voiceSnap) && d.vr !== 3);
+    const refinVieja = (d) => !!(d && (d.voiceRefined || d.voiceSnap || d.voiceWords) && d.vr !== 3);
     try {
       const g = api();
       if (g && g.loadCachedLyrics) {
@@ -3585,6 +3604,7 @@
                 const L = { type: 'synced', lines, source: 'archivo .lrc' };
                 if (lines.estimated) L.estimated = true;
                 if (lines.voiceAligned) L.voiceAligned = true;
+                if (lines.voiceWords) L.voiceWords = true;
                 if (lines.alignedDur) L.alignedDur = lines.alignedDur;
                 setOfflineLyrics(t, L);
                 return;
@@ -3878,12 +3898,7 @@
     const fp = t.path || (g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
     if (!fp) return;
     try {
-      const lrcText = lines.map(l => {
-        const sec = Math.max(0, Number(l.t) || 0);
-        const m = Math.floor(sec / 60);
-        const s = (sec % 60).toFixed(2).padStart(5, '0');
-        return '[' + String(m).padStart(2, '0') + ':' + s + ']' + (l.text || '');
-      }).join('\n');
+      const lrcText = lines.map(lrcLineText).join('\n');
       g.saveLrc(fp, lrcText).catch(() => {});
     } catch (e) { }
   }
@@ -4341,6 +4356,7 @@
       v: 3, vr: 3, type: 'synced', lines: L.lines, dur: durSec(t), source: L.source,
       estimated: !!L.estimated,
       voiceAligned: !!L.voiceAligned, voiceRefined: true, voiceShift: L.voiceShift,
+      voiceWords: !!L.voiceWords,
       alignedDur: L.alignedDur,
       fileSig: fileSigOf(t, durSec(t))
     });
@@ -4354,14 +4370,12 @@
         else if (L.voiceAligned) {
           tags.push('[re:alineada-voz]');
           if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
+        } else if (L.voiceWords) {
+          tags.push('[re:palabras-voz]');
+          if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
         }
         const lrcText = (tags.length ? tags.join('\n') + '\n' : '') +
-          L.lines.map(l => {
-            const sec = Math.max(0, Number(l.t) || 0);
-            const m = Math.floor(sec / 60);
-            const s = (sec % 60).toFixed(2).padStart(5, '0');
-            return '[' + String(m).padStart(2, '0') + ':' + s + ']' + (l.text || '');
-          }).join('\n');
+          L.lines.map(lrcLineText).join('\n');
         g.saveLrc(fp, lrcText).catch(() => {});
       }
     } catch (e) { }
@@ -4878,18 +4892,80 @@
     return true;
   }
 
+  // Palabras pegadas a la voz en un LRC real.
+  //
+  // Los LRC de internet traen el tiempo de cada LÍNEA, pero no de cada palabra.
+  // El reproductor repartía las palabras por su longitud, así que dentro de la
+  // línea el resaltado avanzaba a reloj y no con el cantante (y la última palabra
+  // podía seguir encendida durante el silencio). Aquí se ancla cada palabra a un
+  // ataque de voz real y se recorta el final de la línea al final de la frase
+  // cantada, sin invadir la línea siguiente.
+  //
+  // No se mueve ni un tiempo de línea: se comprobó con LRC de referencia que los
+  // inicios reales ya caen a ~0,1 s del ataque de voz y moverlos los empeora.
+  function refineWordsToVoice(t, A) {
+    const L = t.lyrics;
+    if (!L || !Array.isArray(L.lines) || L.lines.length < 2) return 0;
+    const phrases = (Array.isArray(A.phrases) ? A.phrases : [])
+      .filter(p => p && isFinite(p.t) && isFinite(p.end) && p.end > p.t);
+    const onsets = (Array.isArray(A.onsets) ? A.onsets : [])
+      .filter(x => isFinite(x) && x >= 0).sort((a, b) => a - b);
+    if (!phrases.length || onsets.length < 8) return 0;
+    let added = 0;
+    for (let i = 0; i < L.lines.length; i++) {
+      const line = L.lines[i];
+      if (!line) continue;
+      // Un LRC enriquecido ya trae marcas reales <mm:ss.xx>: no se tocan.
+      if (Array.isArray(line.words) && line.words.length > 1) continue;
+      const start = +line.t;
+      if (!isFinite(start) || start < 0) continue;
+      const nextRaw = i + 1 < L.lines.length ? +L.lines[i + 1].t : start + 8;
+      if (!(nextRaw > start + 0.3)) continue;
+      let end = Math.min(nextRaw, start + 10);
+      // Frase vocal que contiene el inicio de la línea (las frases pueden
+      // agrupar varias líneas: nunca se pasa del inicio de la siguiente).
+      let ph = null, bestD = 1.1;
+      for (let k = 0; k < phrases.length; k++) {
+        const p = phrases[k];
+        if (start < p.t - 1.0 || start > p.end + 0.2) continue;
+        const d = Math.abs(p.t - start);
+        if (d < bestD) { bestD = d; ph = p; }
+      }
+      if (ph) end = Math.min(end, Math.max(start + 0.4, ph.end + 0.25));
+      if (!(end > start + 0.35)) continue;
+      const words = wordsFromOnsets(line.text, start, end, onsets);
+      if (!words) continue;
+      line.end = end;
+      line.words = words;
+      added++;
+    }
+    if (!added) return 0;
+    L.voiceWords = true;
+    L.voiceSnap = false;
+    const title = String(t.title || '').slice(0, 26);
+    dbg('voz: palabras pegadas [' + title + '] ' + added + '/' + L.lines.length + ' líneas');
+    return added;
+  }
+
   async function maybeAlignToVoice(t) {
     if (!t || state.tracks[state.index] !== t) return;
     const L = t.lyrics;
     if (!L || L.type === 'none' || L.type === 'credits') return;
+    // ¿La letra ya trae tiempos por palabra (propias o puestas por una versión
+    // anterior)? Si no, conviene analizar la voz aunque la línea ya esté pegada.
+    const hasVoiceWords = (X) => !!(X && (X.voiceWords ||
+      (Array.isArray(X.lines) && X.lines.some(l => Array.isArray(l.words) && l.words.length > 1))));
     // Si ya se alineó/refinó pero para un archivo distinto (original vs GMV/remix),
     // volver a analizar contra el audio actual.
     const curFileSig = fileSigOf(t, durSec(t));
-    if ((L.voiceAligned || L.voiceRefined || L.voiceSnap) && curFileSig && L.fileSig === curFileSig) return;
+    if ((L.voiceAligned || L.voiceRefined || L.voiceSnap || L.voiceWords) &&
+        curFileSig && L.fileSig === curFileSig && hasVoiceWords(L)) return;
     // LRC ya alineado con la voz para este mismo audio: no hace falta volver a
-    // analizarlo ni arriesgarse a que un refinamiento posterior lo mueva.
+    // analizarlo ni arriesgarse a que un refinamiento posterior lo mueva. Salvo
+    // que le falten las marcas por palabra.
     const durNow = durSec(t);
-    if (L.voiceAligned && isFinite(L.alignedDur) && durNow &&
+    if ((L.voiceAligned || L.voiceWords) && hasVoiceWords(L) &&
+        isFinite(L.alignedDur) && durNow &&
         Math.abs(L.alignedDur - durNow) <= 2) {
       L.fileSig = curFileSig;
       return;
@@ -4923,7 +4999,8 @@
         const cur = t.lyrics;
         if (!cur || cur.type === 'none' || cur.type === 'credits') return;
         const curFileSig2 = fileSigOf(t, durSec(t));
-        if ((cur.voiceAligned || cur.voiceRefined || cur.voiceSnap) && curFileSig2 && cur.fileSig === curFileSig2) return;
+        if ((cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) &&
+            curFileSig2 && cur.fileSig === curFileSig2 && hasVoiceWords(cur)) return;
         // Un LRC "aproximado" (tiempos repartidos por largo de línea) también se
         // re-alinea con las frases y ataques de voz. Antes caía en la rama de LRC
         // ya sincronizado y solo se le podía aplicar un desfase global, así que la
@@ -4936,16 +5013,29 @@
           alignPlainToVoice(t, A);
         }
         else if (cur.type === 'synced') {
-          cur.voiceAligned = false;
-          cur.voiceRefined = false; cur.voiceShift = undefined; cur.voiceSnap = false;
-          refineSyncedToVoice(t, A);
+          if ((cur.voiceAligned || cur.voiceRefined) && !cur.estimated) {
+            // Ya estaba pegada a la voz (p. ej. un .lrc etiquetado): solo se
+            // añaden las palabras, sin volver a tocar los tiempos de línea.
+            refineWordsToVoice(t, A);
+          } else {
+            cur.voiceAligned = false;
+            cur.voiceRefined = false; cur.voiceShift = undefined; cur.voiceSnap = false;
+            refineSyncedToVoice(t, A);
+            // Aunque el LRC no necesite desfase, sus líneas no traen tiempos por
+            // palabra: se pegan a los ataques de voz para que el resaltado siga al
+            // cantante dentro de cada línea.
+            refineWordsToVoice(t, A);
+          }
         }
-        if (cur.voiceAligned || cur.voiceRefined || cur.voiceSnap) {
+        // Un LRC que ya traía marcas por palabra también cuenta como corregido:
+        // no hay que volver a analizarlo en cada reproducción.
+        if (cur.type === 'synced' && hasVoiceWords(cur)) cur.voiceWords = true;
+        if (cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) {
           // Guardar la firma en memoria: evita repetir el análisis en cada render.
           cur.fileSig = fileSigOf(t, durSec(t));
           if (cur.voiceAligned) cur.alignedDur = Math.round(durSec(t) || 0) || undefined;
         }
-        if (!cur.voiceAligned && !cur.voiceRefined && !cur.voiceSnap) {
+        if (!cur.voiceAligned && !cur.voiceRefined && !cur.voiceSnap && !cur.voiceWords) {
           t._voiceSkipUntil = Date.now() + 180000;      // no repetir el análisis
           dbg(cur.type === 'synced'
             ? 'voz: el LRC ya coincide con el audio (sin corrección)'
@@ -4967,27 +5057,31 @@
           v: 3, vr: 3, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
           estimated: !!cur.estimated,
           voiceAligned: !!cur.voiceAligned, voiceRefined: !!cur.voiceRefined, voiceSnap: !!cur.voiceSnap,
+          voiceWords: !!cur.voiceWords,
           alignedDur: cur.alignedDur,
           fileSig: fileSigOf(t, durSec(t))
         });
-        // La alineación de una letra simple también se guarda con tiempos junto
-        // al audio: así sobrevive sin caché (otro PC, otro perfil, sin internet).
-        if (cur.voiceAligned && !cur.voiceRefined && !cur.voiceSnap &&
-            Array.isArray(cur.lines) && cur.lines.length >= 3) {
+        // Guardar el LRC con marcas por palabra junto al audio: así el resaltado
+        // fino sobrevive sin caché (otro PC, sin internet) y no hay que repetir
+        // el análisis de voz en cada reproducción.
+        if (Array.isArray(cur.lines) && cur.lines.length >= 3 &&
+            cur.lines.some(l => Array.isArray(l.words) && l.words.length > 1)) {
           try {
-            const fpLrc = fp.replace(/\.[^.]+$/, '') + '.lrc';
-            const durTag = durSec(t) ? '[length:' + Math.round(durSec(t)) + ']\n' : '';
-            g.saveLrc(fpLrc, '[re:alineada-voz]\n' + durTag + cur.lines.map(l => {
-              const sec = Math.max(0, Number(l.t) || 0);
-              const m = Math.floor(sec / 60);
-              const s = (sec % 60).toFixed(2).padStart(5, '0');
-              return '[' + String(m).padStart(2, '0') + ':' + s + ']' + (l.text || '');
-            }).join('\n')).catch(() => {});
+            const tags = [];
+            if (cur.estimated) tags.push('[re:avance aproximado]');
+            else if (cur.voiceAligned) tags.push('[re:alineada-voz]');
+            else tags.push('[re:palabras-voz]');
+            if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
+            g.saveLrc(fp, tags.join('\n') + '\n' + cur.lines.map(lrcLineText).join('\n')).catch(() => {});
           } catch (e) { }
         }
+        // Si se analizó solo para añadir palabras y no se pudieron añadir, no
+        // repetir el análisis en bucle en cada repintado de la letra.
+        if (!hasVoiceWords(cur)) t._voiceSkipUntil = Date.now() + 180000;
         if (state.tracks[state.index] === t) { renderLyrics(); }
         dbg('letra pegada a la voz [' + String(t.title || '').slice(0, 26) + ']: ' +
-            (cur.voiceAligned ? 'alineada' : cur.voiceRefined ? 'desfase ' + cur.voiceShift + 's' : 'sin cambios') +
+            (cur.voiceAligned ? 'alineada' : cur.voiceRefined ? 'desfase ' + cur.voiceShift + 's'
+              : cur.voiceWords ? 'palabras' : 'sin cambios') +
             ' frases=' + A.phrases.length);
       } catch (e) {
         t._voiceSkipUntil = Date.now() + 60000;
@@ -5015,6 +5109,7 @@
     if (L && Array.isArray(L.lines) && L.lines.length) {
       const how = L.voiceAligned ? 'alineada con la voz'
         : L.voiceRefined ? 'desfase corregido'
+        : L.voiceWords ? 'palabras pegadas a la voz'
         : L.estimated ? 'avance aproximado' : 'sincronizada';
       el.textContent = '✓ ' + L.lines.length + ' líneas · ' + how +
         (L.offline ? ' · guardada sin internet' : '');
@@ -5087,7 +5182,9 @@
           .map(x => `<div class="ly dim">${esc(x)}</div>`).join('');
       return;
     }
-    const headTxt = L.estimated ? 'letra sin tiempos · avance aproximado' : (L.source || 'sincronizada con la voz');
+    const headTxt = L.estimated ? 'letra sin tiempos · avance aproximado'
+      : L.voiceWords ? 'palabras pegadas a la voz'
+      : (L.source || 'sincronizada con la voz');
     box.innerHTML =
       `<div class="ly head">${esc(headTxt)}</div>` +
       L.lines.map((ln, i) =>
