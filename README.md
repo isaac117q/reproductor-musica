@@ -13,12 +13,13 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Reproducción de audio con letras sincronizadas
 - Búsqueda automática de letras (lrclib, letras.com, lyrics.ovh)
 - Sincronización automática con la voz (análisis de audio)
-- Las letras LRC resaltan palabra por palabra siguiendo la voz del cantante
+- Las letras LRC resaltan palabra por palabra siguiendo la voz del cantante, con relleno progresivo (efecto karaoke fluido)
 - Indicador automático de sincronía con la voz: avisa si la letra va adelantada, atrasada o no coincide (solo informa, no cambia los tiempos)
 - Verificación de letra correcta (idioma, artista, similitud)
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
 - El botón Actualizar muestra el progreso de la descarga y un punto cuando hay una versión nueva
+- Actualización ligera: tras la primera instalación, las siguientes descargan solo la app (~4 MB), no el instalador completo
 
 ## Instalación
 

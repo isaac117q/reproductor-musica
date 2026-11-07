@@ -1,6 +1,8 @@
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
 // Configurar auto-updater: notificar al usuario cuando hay actualización
@@ -628,14 +630,170 @@ app.whenReady().then(() => {
   });
 });
 
+// ================= Actualización ligera (solo app.asar) =================
+// El instalador NSIS pesa ~82 MB porque incluye Electron. Para actualizar solo
+// cambia la app (main.js, preload.js, index.html y sus dependencias, ~4 MB), así
+// que se descarga únicamente ese archivo y se sustituye al cerrar la app.
+// El instalador completo sigue existiendo para la primera instalación.
+const APP_UPDATE_INFO_URL = 'https://github.com/isaac117q/reproductor-musica/releases/latest/download/latest-app.json';
+const APP_UPDATE_ASAR_URL = 'https://github.com/isaac117q/reproductor-musica/releases/latest/download/app.asar';
+
+function updCmp(a, b) {
+  const pa = String(a || '').replace(/^v/i, '').split(/[.+-]/).map(x => parseInt(x, 10) || 0);
+  const pb = String(b || '').replace(/^v/i, '').split(/[.+-]/).map(x => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
+function updatesDir() { return path.join(app.getPath('userData'), 'updates'); }
+function pendingUpdateFile() { return path.join(updatesDir(), 'pending.json'); }
+function readPendingUpdate() {
+  try { return JSON.parse(fs.readFileSync(pendingUpdateFile(), 'utf8')); } catch (e) { return null; }
+}
+function clearPendingUpdate() {
+  try { fs.unlinkSync(pendingUpdateFile()); } catch (e) { /* ya no existe */ }
+}
+
+async function fetchLightUpdateInfo() {
+  const r = await fetch(APP_UPDATE_INFO_URL + '?t=' + Date.now(), {
+    headers: { 'User-Agent': 'reproductor-musica', 'Cache-Control': 'no-cache' },
+    cache: 'no-store'
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (!j || !j.version) return null;
+  return j;
+}
+
+// Descarga app.asar con progreso (el botón "Actualizar" muestra el porcentaje).
+async function downloadLightUpdate(info) {
+  const win = mainWindow || BrowserWindow.getAllWindows()[0];
+  const send = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); };
+  const res = await fetch(APP_UPDATE_ASAR_URL + '?t=' + Date.now(), {
+    headers: { 'User-Agent': 'reproductor-musica', 'Cache-Control': 'no-cache' },
+    cache: 'no-store'
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const total = Number(res.headers.get('content-length')) || Number(info.size) || 0;
+  const chunks = [];
+  let received = 0, lastPct = -1;
+  if (res.body && res.body.getReader) {
+    const reader = res.body.getReader();
+    for (;;) {
+      const step = await reader.read();
+      if (step.done) break;
+      const chunk = Buffer.from(step.value);
+      chunks.push(chunk);
+      received += chunk.length;
+      const pct = total ? Math.min(100, Math.round(received * 100 / total)) : 50;
+      if (pct !== lastPct) {
+        lastPct = pct;
+        send('update-progress', { percent: pct, transferred: received, total });
+      }
+    }
+  } else {
+    const buf = Buffer.from(await res.arrayBuffer());
+    chunks.push(buf);
+    received = buf.length;
+    send('update-progress', { percent: 100, transferred: received, total });
+  }
+  const buf = Buffer.concat(chunks);
+  if (info.size && buf.length !== Number(info.size)) {
+    throw new Error('La descarga no tiene el tamaño esperado');
+  }
+  const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+  if (info.sha256 && sha256.toLowerCase() !== String(info.sha256).toLowerCase()) {
+    throw new Error('La actualización descargada no coincide');
+  }
+  const dir = updatesDir();
+  await fsp.mkdir(dir, { recursive: true });
+  const file = path.join(dir, 'app-' + String(info.version).replace(/[^\w.-]/g, '') + '.asar');
+  await fsp.writeFile(file, buf);
+  await fsp.writeFile(pendingUpdateFile(), JSON.stringify({
+    version: info.version, file, sha256, size: buf.length
+  }));
+  await appendDebug('actualización ligera descargada: v' + info.version + ' (' + buf.length + ' bytes)');
+  send('update-downloaded', info.version);
+  return { ok: true, version: info.version, size: buf.length };
+}
+
+function appAsarPath() {
+  if (!app.isPackaged) return null;
+  return path.join(path.dirname(process.execPath), 'resources', 'app.asar');
+}
+
+// Al cerrar la app: un script oculto espera a que termine el proceso y
+// sustituye resources/app.asar. No hace falta instalar nada ni descargar el exe.
+function scheduleApplyUpdateOnQuit() {
+  const p = readPendingUpdate();
+  if (!p || !p.file || !fs.existsSync(p.file)) return false;
+  if (updCmp(p.version, app.getVersion()) <= 0) { clearPendingUpdate(); return false; }
+  const target = appAsarPath();
+  if (!target || !fs.existsSync(target)) return false;
+  const dir = updatesDir();
+  const script = path.join(dir, 'apply-update.ps1');
+  const log = path.join(dir, 'apply-update.log');
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  const ps = [
+    "$ErrorActionPreference = 'SilentlyContinue'",
+    'Start-Sleep -Milliseconds 700',
+    'Wait-Process -Id ' + process.pid + ' -ErrorAction SilentlyContinue',
+    'Start-Sleep -Milliseconds 500',
+    'Copy-Item -LiteralPath ' + q(p.file) + ' -Destination ' + q(target) + ' -Force',
+    'if ($?) {',
+    '  Remove-Item -LiteralPath ' + q(p.file) + ' -Force',
+    '  Remove-Item -LiteralPath ' + q(pendingUpdateFile()) + ' -Force',
+    "  Add-Content -LiteralPath " + q(log) + " -Value ('OK ' + (Get-Date -Format s) + ' v" + String(p.version).replace(/'/g, '') + "')",
+    '} else {',
+    "  Add-Content -LiteralPath " + q(log) + " -Value ('FALLO ' + (Get-Date -Format s))",
+    '}',
+    'Remove-Item -LiteralPath ' + q(script) + ' -Force'
+  ].join('\r\n');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(script, ps, 'utf8');
+    const child = spawn('powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script],
+      { detached: true, stdio: 'ignore', windowsHide: true });
+    child.unref();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+let applyingLightUpdate = false;
+app.on('before-quit', () => {
+  if (applyingLightUpdate) return;
+  applyingLightUpdate = true;
+  scheduleApplyUpdateOnQuit();
+});
+
 // IPC para actualizaciones
 ipcMain.handle('check-for-updates', async () => {
+  // 1) Intentar la actualización ligera (app.asar). Si existe en la última
+  //    release, se descarga solo eso y no el instalador completo.
+  let light = null;
+  try { light = await fetchLightUpdateInfo(); } catch (e) { light = null; }
+  if (light && updCmp(light.version, app.getVersion()) > 0) {
+    downloadLightUpdate(light).catch(err => {
+      const win = mainWindow || BrowserWindow.getAllWindows()[0];
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('update-error', String(err && err.message || err));
+      }
+      appendDebug('actualización ligera: error ' + (err && err.message || err));
+    });
+    return { ok: true, available: true, version: light.version, light: true };
+  }
+  // 2) Si esa release no publicó app.asar, usar el instalador de siempre.
   try {
     const result = await autoUpdater.checkForUpdates();
     const info = result && result.updateInfo;
     const available = !!(result && result.isUpdateAvailable);
-    // No basta con devolver la versión publicada: si ya es la instalada no hay
-    // actualización. `isUpdateAvailable` lo decide electron-updater.
     return { ok: true, available, version: available && info ? info.version : null };
   } catch (e) {
     return { ok: false, error: e && e.message || String(e) };
@@ -643,6 +801,7 @@ ipcMain.handle('check-for-updates', async () => {
 });
 
 ipcMain.handle('install-update', () => {
+  if (readPendingUpdate()) { app.quit(); return true; }
   autoUpdater.quitAndInstall();
 });
 

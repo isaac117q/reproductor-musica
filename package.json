@@ -1,11 +1,12 @@
 {
   "name": "reproductor-musica",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "Reproductor de música para Windows",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis",
+    "publish:asar": "node scripts/publish-asar.js"
   },
   "author": "Isaac",
   "license": "MIT",
