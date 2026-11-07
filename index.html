@@ -2178,6 +2178,7 @@
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
     <button class="tool" id="btnAddDir" title="Agregar una carpeta completa"><svg class="ic" style="width:15px;height:15px"><use href="#i-folder"/></svg> Carpeta</button>
+    <button class="tool" id="btnUpdate" title="Buscar actualizaciones"><svg class="ic" style="width:15px;height:15px"><use href="#i-download"/></svg> Actualizar</button>
     <span class="netst" id="netSt" title="Estado de la conexión a internet"><i id="netDot">●</i> <span id="netTxt">En línea</span></span>
     <button class="tool" id="btnHelp" title="Atajos de teclado (?)"><svg class="ic" style="width:15px;height:15px"><use href="#i-help"/></svg></button>
   </header>
@@ -2389,6 +2390,7 @@
       <span>Reproducir / pausar</span><kbd>Espacio</kbd>
       <span>Siguiente / anterior</span><kbd>N · P</kbd>
       <span>Adelantar / retroceder 10 s</span><kbd>→ · ←</kbd>
+    <span>Ajustar desfase letra ±0.5 s</span><kbd>Ctrl+→ · Ctrl+←</kbd>
       <span>Volumen</span><kbd>↑ · ↓</kbd>
       <span>Silenciar</span><kbd>M</kbd>
       <span>Favorito</span><kbd>F</kbd>
@@ -2410,6 +2412,12 @@
 <input type="file" id="fileDir" webkitdirectory directory multiple hidden>
 
 <script>
+/* Meyda.js v5.6.3 - audio feature extraction (spectral flux, HFC, etc.)
+   Fuente: node_modules/meyda/dist/web/meyda.min.js (inline para funcionar sin internet) */
+!function(r,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):(r="undefined"!=typeof globalThis?globalThis:r||self).Meyda=t()}(this,(function(){"use strict";function r(r,t,e){if(e||2===arguments.length)for(var a,n=0,o=t.length;n<o;n++)!a&&n in t||(a||(a=Array.prototype.slice.call(t,0,n)),a[n]=t[n]);return r.concat(a||Array.prototype.slice.call(t))}var t=Object.freeze({__proto__:null,blackman:function(r){for(var t=new Float32Array(r),e=2*Math.PI/(r-1),a=2*e,n=0;n<r/2;n++)t[n]=.42-.5*Math.cos(n*e)+.08*Math.cos(n*a);for(n=Math.ceil(r/2);n>0;n--)t[r-n]=t[n-1];return t},hamming:function(r){for(var t=new Float32Array(r),e=0;e<r;e++)t[e]=.54-.46*Math.cos(2*Math.PI*(e/r-1));return t},hanning:function(r){for(var t=new Float32Array(r),e=0;e<r;e++)t[e]=.5-.5*Math.cos(2*Math.PI*e/(r-1));return t},sine:function(r){for(var t=Math.PI/(r-1),e=new Float32Array(r),a=0;a<r;a++)e[a]=Math.sin(t*a);return e}}),e={};function a(r){for(;r%2==0&&r>1;)r/=2;return 1===r}function n(r,a){if("rect"!==a){if(""!==a&&a||(a="hanning"),e[a]||(e[a]={}),!e[a][r.length])try{e[a][r.length]=t[a](r.length)}catch(r){throw new Error("Invalid windowing function")}r=function(r,t){for(var e=[],a=0;a<Math.min(r.length,t.length);a++)e[a]=r[a]*t[a];return e}(r,e[a][r.length])}return r}function o(r,t,e){for(var a=new Float32Array(r),n=0;n<a.length;n++)a[n]=n*t/e,a[n]=13*Math.atan(a[n]/1315.8)+3.5*Math.atan(Math.pow(a[n]/7518,2));return a}function i(r){return Float32Array.from(r)}function u(r){return 1125*Math.log(1+r/700)}function f(r,t,e){for(var a,n=new Float32Array(r+2),o=new Float32Array(r+2),i=t/2,f=u(0),c=(u(i)-f)/(r+1),l=new Array(r+2),s=0;s<n.length;s++)n[s]=s*c,o[s]=(a=n[s],700*(Math.exp(a/1125)-1)),l[s]=Math.floor((e+1)*o[s]/t);for(var m=new Array(r),p=0;p<m.length;p++){m[p]=new Array(e/2+1).fill(0);for(s=l[p];s<l[p+1];s++)m[p][s]=(s-l[p])/(l[p+1]-l[p]);for(s=l[p+1];s<l[p+2];s++)m[p][s]=(l[p+2]-s)/(l[p+2]-l[p+1])}return m}function c(t,e,a,n,o,i,u){void 0===n&&(n=5),void 0===o&&(o=2),void 0===i&&(i=!0),void 0===u&&(u=440);var f=Math.floor(a/2)+1,c=new Array(a).fill(0).map((function(r,n){return t*function(r,t){return Math.log2(16*r/t)}(e*n/a,u)}));c[0]=c[1]-1.5*t;var l,s,m,p=c.slice(1).map((function(r,t){return Math.max(r-c[t])}),1).concat([1]),h=Math.round(t/2),g=new Array(t).fill(0).map((function(r,e){return c.map((function(r){return(10*t+h+r-e)%t-h}))})),w=g.map((function(r,t){return r.map((function(r,e){return Math.exp(-.5*Math.pow(2*g[t][e]/p[e],2))}))}));if(s=(l=w)[0].map((function(){return 0})),m=l.reduce((function(r,t){return t.forEach((function(t,e){r[e]+=Math.pow(t,2)})),r}),s).map(Math.sqrt),w=l.map((function(r,t){return r.map((function(r,t){return r/(m[t]||1)}))})),o){var v=c.map((function(r){return Math.exp(-.5*Math.pow((r/t-n)/o,2))}));w=w.map((function(r){return r.map((function(r,t){return r*v[t]}))}))}return i&&(w=r(r([],w.slice(3),!0),w.slice(0,3),!0)),w.map((function(r){return r.slice(0,f)}))}function l(r,t){for(var e=0,a=0,n=0;n<t.length;n++)e+=Math.pow(n,r)*Math.abs(t[n]),a+=t[n];return e/a}function s(r){var t=r.ampSpectrum,e=r.barkScale,a=r.numberOfBarkBands,n=void 0===a?24:a;if("object"!=typeof t||"object"!=typeof e)throw new TypeError;var o=n,i=new Float32Array(o),u=0,f=t,c=new Int32Array(o+1);c[0]=0;for(var l=e[f.length-1]/o,s=1,m=0;m<f.length;m++)for(;e[m]>l;)c[s++]=m,l=s*e[f.length-1]/o;c[o]=f.length-1;for(m=0;m<o;m++){for(var p=0,h=c[m];h<c[m+1];h++)p+=f[h];i[m]=Math.pow(p,.23)}for(m=0;m<i.length;m++)u+=i[m];return{specific:i,total:u}}function m(r){var t=r.ampSpectrum;if("object"!=typeof t)throw new TypeError;for(var e=new Float32Array(t.length),a=0;a<e.length;a++)e[a]=Math.pow(t[a],2);return e}function p(r){var t=r.ampSpectrum,e=r.melFilterBank,a=r.bufferSize;if("object"!=typeof t)throw new TypeError("Valid ampSpectrum is required to generate melBands");if("object"!=typeof e)throw new TypeError("Valid melFilterBank is required to generate melBands");for(var n=m({ampSpectrum:t}),o=e.length,i=Array(o),u=new Float32Array(o),f=0;f<u.length;f++){i[f]=new Float32Array(a/2),u[f]=0;for(var c=0;c<a/2;c++)i[f][c]=e[f][c]*n[c],u[f]+=i[f][c];u[f]=Math.log(u[f]+1)}return Array.prototype.slice.call(u)}function h(r){return r&&r.__esModule&&Object.prototype.hasOwnProperty.call(r,"default")?r.default:r}var g=null;var w=h((function(r,t){var e=r.length;return t=t||2,g&&g[e]||function(r){(g=g||{})[r]=new Array(r*r);for(var t=Math.PI/r,e=0;e<r;e++)for(var a=0;a<r;a++)g[r][a+e*r]=Math.cos(t*(a+.5)*e)}(e),r.map((function(){return 0})).map((function(a,n){return t*r.reduce((function(r,t,a,o){return r+t*g[e][a+n*e]}),0)}))}));var v=Object.freeze({__proto__:null,amplitudeSpectrum:function(r){return r.ampSpectrum},buffer:function(r){return r.signal},chroma:function(r){var t=r.ampSpectrum,e=r.chromaFilterBank;if("object"!=typeof t)throw new TypeError("Valid ampSpectrum is required to generate chroma");if("object"!=typeof e)throw new TypeError("Valid chromaFilterBank is required to generate chroma");var a=e.map((function(r,e){return t.reduce((function(t,e,a){return t+e*r[a]}),0)})),n=Math.max.apply(Math,a);return n?a.map((function(r){return r/n})):a},complexSpectrum:function(r){return r.complexSpectrum},energy:function(r){var t=r.signal;if("object"!=typeof t)throw new TypeError;for(var e=0,a=0;a<t.length;a++)e+=Math.pow(Math.abs(t[a]),2);return e},loudness:s,melBands:p,mfcc:function(r){var t=r.ampSpectrum,e=r.melFilterBank,a=r.numberOfMFCCCoefficients,n=r.bufferSize,o=Math.min(40,Math.max(1,a||13));if(e.length<o)throw new Error("Insufficient filter bank for requested number of coefficients");var i=p({ampSpectrum:t,melFilterBank:e,bufferSize:n});return w(i).slice(0,o)},perceptualSharpness:function(r){for(var t=s({ampSpectrum:r.ampSpectrum,barkScale:r.barkScale}),e=t.specific,a=0,n=0;n<e.length;n++)a+=n<15?(n+1)*e[n+1]:.066*Math.exp(.171*(n+1));return a*=.11/t.total},perceptualSpread:function(r){for(var t=s({ampSpectrum:r.ampSpectrum,barkScale:r.barkScale}),e=0,a=0;a<t.specific.length;a++)t.specific[a]>e&&(e=t.specific[a]);return Math.pow((t.total-e)/t.total,2)},powerSpectrum:m,rms:function(r){var t=r.signal;if("object"!=typeof t)throw new TypeError;for(var e=0,a=0;a<t.length;a++)e+=Math.pow(t[a],2);return e/=t.length,e=Math.sqrt(e)},spectralCentroid:function(r){var t=r.ampSpectrum;if("object"!=typeof t)throw new TypeError;return l(1,t)},spectralCrest:function(r){var t=r.ampSpectrum;if("object"!=typeof t)throw new TypeError;var e=0,a=-1/0;return t.forEach((function(r){e+=Math.pow(r,2),a=r>a?r:a})),e/=t.length,e=Math.sqrt(e),a/e},spectralFlatness:function(r){var t=r.ampSpectrum;if("object"!=typeof t)throw new TypeError;for(var e=0,a=0,n=0;n<t.length;n++)e+=Math.log(t[n]),a+=t[n];return Math.exp(e/t.length)*t.length/a},spectralFlux:function(r){var t=r.signal,e=r.previousSignal,a=r.bufferSize;if("object"!=typeof t||"object"!=typeof e)throw new TypeError;for(var n=0,x=0,o=-a/2;o<t.length/2-1;o++)x=Math.abs(t[o])-Math.abs(e[o]),n+=(x+Math.abs(x))/2;return n},spectralKurtosis:function(r){var t=r.ampSpectrum;if("object"!=typeof t)throw new TypeError;var e=t,a=l(1,e),n=l(2,e),o=l(3,e),i=l(4,e);return(-3*Math.pow(a,4)+6*a*n-4*a*o+i)/Math.pow(Math.sqrt(n-Math.pow(a,2)),4)},spectralRolloff:function(r){var t=r.ampSpectrum,e=r.sampleRate;if("object"!=typeof t)throw new TypeError;for(var a=t,n=e/(2*(a.length-1)),o=0,i=0;i<a.length;i++)o+=a[i];for(var u=.99*o,f=a.length-1;o>u&&f>=0;)o-=a[f],--f;return(f+1)*n},spectralSkewness:function(r){var t=r.ampSpectrum;if("object"!=typeof t)throw new TypeError;var e=l(1,t),a=l(2,t),n=l(3,t);return(2*Math.pow(e,3)-3*e*a+n)/Math.pow(Math.sqrt(a-Math.pow(e,2)),3)},spectralSlope:function(r){var t=r.ampSpectrum,e=r.sampleRate,a=r.bufferSize;if("object"!=typeof t)throw new TypeError;for(var n=0,o=0,i=new Float32Array(t.length),u=0,f=0,c=0;c<t.length;c++){n+=t[c];var l=c*e/a;i[c]=l,u+=l*l,o+=l,f+=l*t[c]}return(t.length*f-o*n)/(n*(u-Math.pow(o,2)))},spectralSpread:function(r){var t=r.ampSpectrum;if("object"!=typeof t)throw new TypeError;return Math.sqrt(l(2,t)-Math.pow(l(1,t),2))},zcr:function(r){var t=r.signal;if("object"!=typeof t)throw new TypeError;for(var e=0,a=1;a<t.length;a++)(t[a-1]>=0&&t[a]<0||t[a-1]<0&&t[a]>=0)&&e++;return e}});function d(r){if(Array.isArray(r)){for(var t=0,e=Array(r.length);t<r.length;t++)e[t]=r[t];return e}return Array.from(r)}var y={},S={},_={bitReverseArray:function(r){if(void 0===y[r]){for(var t=(r-1).toString(2).length,e="0".repeat(t),a={},n=0;n<r;n++){var o=n.toString(2);o=e.substr(o.length)+o,o=[].concat(d(o)).reverse().join(""),a[n]=parseInt(o,2)}y[r]=a}return y[r]},multiply:function(r,t){return{real:r.real*t.real-r.imag*t.imag,imag:r.real*t.imag+r.imag*t.real}},add:function(r,t){return{real:r.real+t.real,imag:r.imag+t.imag}},subtract:function(r,t){return{real:r.real-t.real,imag:r.imag-t.imag}},euler:function(r,t){var e=-2*Math.PI*r/t;return{real:Math.cos(e),imag:Math.sin(e)}},conj:function(r){return r.imag*=-1,r},constructComplexArray:function(r){var t={};t.real=void 0===r.real?r.slice():r.real.slice();var e=t.real.length;return void 0===S[e]&&(S[e]=Array.apply(null,Array(e)).map(Number.prototype.valueOf,0)),t.imag=S[e].slice(),t}},b=function(r){var t={};void 0===r.real||void 0===r.imag?t=_.constructComplexArray(r):(t.real=r.real.slice(),t.imag=r.imag.slice());var e=t.real.length,a=Math.log2(e);if(Math.round(a)!=a)throw new Error("Input size must be a power of 2.");if(t.real.length!=t.imag.length)throw new Error("Real and imaginary components must have the same length.");for(var n=_.bitReverseArray(e),o={real:[],imag:[]},i=0;i<e;i++)o.real[n[i]]=t.real[i],o.imag[n[i]]=t.imag[i];for(var u=0;u<e;u++)t.real[u]=o.real[u],t.imag[u]=o.imag[u];for(var f=1;f<=a;f++)for(var c=Math.pow(2,f),l=0;l<c/2;l++)for(var s=_.euler(l,c),m=0;m<e/c;m++){var p=c*m+l,h=c*m+l+c/2,g={real:t.real[p],imag:t.imag[p]},w={real:t.real[h],imag:t.imag[h]},v=_.multiply(s,w),d=_.subtract(g,v);t.real[h]=d.real,t.imag[h]=d.imag;var y=_.add(v,g);t.real[p]=y.real,t.imag[p]=y.imag}return t},M=b,F=function(){function r(r,t){var e=this;if(this._m=t,!r.audioContext)throw this._m.errors.noAC;if(r.bufferSize&&!a(r.bufferSize))throw this._m._errors.notPow2;if(!r.source)throw this._m._errors.noSource;this._m.audioContext=r.audioContext,this._m.bufferSize=r.bufferSize||this._m.bufferSize||256,this._m.hopSize=r.hopSize||this._m.hopSize||this._m.bufferSize,this._m.sampleRate=r.sampleRate||this._m.audioContext.sampleRate||44100,this._m.callback=r.callback,this._m.windowingFunction=r.windowingFunction||"hanning",this._m.featureExtractors=v,this._m.EXTRACTION_STARTED=r.startImmediately||!1,this._m.channel="number"==typeof r.channel?r.channel:0,this._m.inputs=r.inputs||1,this._m.outputs=r.outputs||1,this._m.numberOfMFCCCoefficients=r.numberOfMFCCCoefficients||this._m.numberOfMFCCCoefficients||13,this._m.numberOfBarkBands=r.numberOfBarkBands||this._m.numberOfBarkBands||24,this._m.spn=this._m.audioContext.createScriptProcessor(this._m.bufferSize,this._m.inputs,this._m.outputs),this._m.spn.connect(this._m.audioContext.destination),this._m._featuresToExtract=r.featureExtractors||[],this._m.barkScale=o(this._m.bufferSize,this._m.sampleRate,this._m.bufferSize),this._m.melFilterBank=f(Math.max(this._m.melBands,this._m.numberOfMFCCCoefficients),this._m.sampleRate,this._m.bufferSize),this._m.inputData=null,this._m.previousInputData=null,this._m.frame=null,this._m.previousFrame=null,this.setSource(r.source),this._m.spn.onaudioprocess=function(r){var t;null!==e._m.inputData&&(e._m.previousInputData=e._m.inputData),e._m.inputData=r.inputBuffer.getChannelData(e._m.channel),e._m.previousInputData?((t=new Float32Array(e._m.previousInputData.length+e._m.inputData.length-e._m.hopSize)).set(e._m.previousInputData.slice(e._m.hopSize)),t.set(e._m.inputData,e._m.previousInputData.length-e._m.hopSize)):t=e._m.inputData;var a=function(r,t,e){if(r.length<t)throw new Error("Buffer is too short for frame length");if(e<1)throw new Error("Hop length cannot be less that 1");if(t<1)throw new Error("Frame length cannot be less that 1");var a=1+Math.floor((r.length-t)/e);return new Array(a).fill(0).map((function(a,n){return r.slice(n*e,n*e+t)}))}(t,e._m.bufferSize,e._m.hopSize);a.forEach((function(r){e._m.frame=r;var t=e._m.extract(e._m._featuresToExtract,e._m.frame,e._m.previousFrame);"function"==typeof e._m.callback&&e._m.EXTRACTION_STARTED&&e._m.callback(t),e._m.previousFrame=e._m.frame}))}}return r.prototype.start=function(r){this._m._featuresToExtract=r||this._m._featuresToExtract,this._m.EXTRACTION_STARTED=!0},r.prototype.stop=function(){this._m.EXTRACTION_STARTED=!1},r.prototype.setSource=function(r){this._m.source&&this._m.source.disconnect(this._m.spn),this._m.source=r,this._m.source.connect(this._m.spn)},r.prototype.setChannel=function(r){r<=this._m.inputs?this._m.channel=r:console.error("Channel ".concat(r," does not exist. Make sure you've provided a value for 'inputs' that is greater than ").concat(r," when instantiating the MeydaAnalyzer"))},r.prototype.get=function(r){return this._m.inputData?this._m.extract(r||this._m._featuresToExtract,this._m.inputData,this._m.previousInputData):null},r}(),A={audioContext:null,spn:null,bufferSize:512,sampleRate:44100,melBands:26,chromaBands:12,callback:null,windowingFunction:"hanning",featureExtractors:v,EXTRACTION_STARTED:!1,numberOfMFCCCoefficients:13,numberOfBarkBands:24,_featuresToExtract:[],windowing:n,_errors:{notPow2:new Error("Meyda: Buffer size must be a power of 2, e.g. 64 or 512"),featureUndef:new Error("Meyda: No features defined."),invalidFeatureFmt:new Error("Meyda: Invalid feature format"),invalidInput:new Error("Meyda: Invalid input."),noAC:new Error("Meyda: No AudioContext specified."),noSource:new Error("Meyda: No source node specified.")},createMeydaAnalyzer:function(r){return new F(r,Object.assign({},A))},listAvailableFeatureExtractors:function(){return Object.keys(this.featureExtractors)},extract:function(r,t,e){var n=this;if(!t)throw this._errors.invalidInput;if("object"!=typeof t)throw this._errors.invalidInput;if(!r)throw this._errors.featureUndef;if(!a(t.length))throw this._errors.notPow2;void 0!==this.barkScale&&this.barkScale.length==this.bufferSize||(this.barkScale=o(this.bufferSize,this.sampleRate,this.bufferSize)),void 0!==this.melFilterBank&&this.barkScale.length==this.bufferSize&&this.melFilterBank.length==this.melBands||(this.melFilterBank=f(Math.max(this.melBands,this.numberOfMFCCCoefficients),this.sampleRate,this.bufferSize)),void 0!==this.chromaFilterBank&&this.chromaFilterBank.length==this.chromaBands||(this.chromaFilterBank=c(this.chromaBands,this.sampleRate,this.bufferSize)),"buffer"in t&&void 0===t.buffer?this.signal=i(t):this.signal=t;var u=E(t,this.windowingFunction,this.bufferSize);if(this.signal=u.windowedSignal,this.complexSpectrum=u.complexSpectrum,this.ampSpectrum=u.ampSpectrum,e){var l=E(e,this.windowingFunction,this.bufferSize);this.previousSignal=l.windowedSignal,this.previousComplexSpectrum=l.complexSpectrum,this.previousAmpSpectrum=l.ampSpectrum}var s=function(r){return n.featureExtractors[r]({ampSpectrum:n.ampSpectrum,chromaFilterBank:n.chromaFilterBank,complexSpectrum:n.complexSpectrum,signal:n.signal,bufferSize:n.bufferSize,sampleRate:n.sampleRate,barkScale:n.barkScale,melFilterBank:n.melFilterBank,previousSignal:n.previousSignal,previousAmpSpectrum:n.previousAmpSpectrum,previousComplexSpectrum:n.previousComplexSpectrum,numberOfMFCCCoefficients:n.numberOfMFCCCoefficients,numberOfBarkBands:n.numberOfBarkBands})};if("object"==typeof r)return r.reduce((function(r,t){var e;return Object.assign({},r,((e={})[t]=s(t),e))}),{});if("string"==typeof r)return s(r);throw this._errors.invalidFeatureFmt}},E=function(r,t,e){var a={};void 0===r.buffer?a.signal=i(r):a.signal=r,a.windowedSignal=n(a.signal,t),a.complexSpectrum=M(a.windowedSignal),a.ampSpectrum=new Float32Array(e/2);for(var o=0;o<e/2;o++)a.ampSpectrum[o]=Math.sqrt(Math.pow(a.complexSpectrum.real[o],2)+Math.pow(a.complexSpectrum.imag[o],2));return a};return"undefined"!=typeof window&&(window.Meyda=A),A}));
+//# sourceMappingURL=meyda.min.js.map
+
+
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
@@ -3267,6 +3275,7 @@
     let offset = 0;
     const om = rawText.match(/\[offset:\s*([+-]?\d+)\s*\]/i);
     if (om) offset = Number(om[1]) / 1000;
+    const lm = rawText.match(/\[length:\s*(\d+(?:\.\d+)?)\s*\]/i);
     const secOf = (min, sec) => {
       const m = +min;
       const v = parseFloat(String(sec).replace(/[:,]/, '.'));
@@ -3305,7 +3314,48 @@
       }
     }
     rows.sort((a, b) => a.t - b.t);
-    return rows.filter((r, i) => i === 0 || r.t !== rows[i - 1].t || r.text !== rows[i - 1].text);
+    const out = rows.filter((r, i) => i === 0 || r.t !== rows[i - 1].t || r.text !== rows[i - 1].text);
+    // Etiquetas de origen: permiten saber si el LRC es aproximado o si ya se
+    // alineó con la voz, sin volver a analizar el audio en cada reproducción.
+    out.estimated = /\[re:[^\]]*aproximad[^\]]*\]/i.test(rawText) || looksEstimatedTimes(out);
+    out.voiceAligned = /\[re:[^\]]*alineada[^\]]*\]/i.test(rawText);
+    if (lm && isFinite(+lm[1])) out.alignedDur = +lm[1];
+    return out;
+  }
+
+  // Detecta un LRC "aproximado": las marcas se repartieron de forma proporcional
+  // al largo de cada línea (ensureTimed). En esas letras los tiempos no siguen al
+  // cantante, así que se pueden re-alinear con la voz sin miedo a empeorarlas.
+  // Se ajusta una recta t = a + b·(peso acumulado) y se mira el residuo.
+  function looksEstimatedTimes(lines) {
+    if (!Array.isArray(lines) || lines.length < 5) return false;
+    const ws = lines.map(l => Math.max(4, String(l.text || '').replace(/\s+/g, '').length + 2));
+    const total = ws.reduce((a, b) => a + b, 0);
+    if (!total) return false;
+    const n = lines.length;
+    let cum = 0, sx = 0, sy = 0, sxy = 0, sxx = 0;
+    for (let i = 0; i < n; i++) {
+      const y = +lines[i].t;
+      if (!isFinite(y) || y < 0) return false;
+      const x = cum / total;
+      cum += ws[i];
+      sx += x; sy += y; sxy += x * y; sxx += x * x;
+    }
+    const den = n * sxx - sx * sx;
+    if (!(Math.abs(den) > 1e-9)) return false;
+    const b = (n * sxy - sx * sy) / den;
+    if (!(b > 20)) return false;                  // debe avanzar en el tiempo
+    const a = (sy - b * sx) / n;
+    let maxErr = 0, sumErr = 0;
+    cum = 0;
+    for (let i = 0; i < n; i++) {
+      const exp = a + b * (cum / total);
+      const err = Math.abs(+lines[i].t - exp);
+      sumErr += err;
+      if (err > maxErr) maxErr = err;
+      cum += ws[i];
+    }
+    return maxErr <= 0.8 && (sumErr / n) <= 0.25;
   }
 
   // Limpia ruido de nombres de archivos: códigos de YouTube [abc123], "(Traducción al Español)", "NCS | Electro |"
@@ -3373,7 +3423,7 @@
     const extra = {
       dur: d.dur, estimated: d.estimated, vr: d.vr, verified: d.verified,
       voiceAligned: d.voiceAligned, voiceRefined: d.voiceRefined, voiceSnap: d.voiceSnap,
-      fileSig: d.fileSig
+      fileSig: d.fileSig, alignedDur: d.alignedDur
     };
     if (Array.isArray(d.lines) && d.lines.length) return { type: 'synced', lines: d.lines, source: d.source, ...extra };
     if (d.text && String(d.text).trim()) return { type: 'plain', text: String(d.text), source: d.source, ...extra };
@@ -3532,7 +3582,11 @@
             if (lines.length) {
               const cuerpo = lines.map(l => l.text || '').join('\n');
               if (idiomaLetraCompatible(t, cuerpo)) {
-                setOfflineLyrics(t, { type: 'synced', lines, source: 'archivo .lrc' });
+                const L = { type: 'synced', lines, source: 'archivo .lrc' };
+                if (lines.estimated) L.estimated = true;
+                if (lines.voiceAligned) L.voiceAligned = true;
+                if (lines.alignedDur) L.alignedDur = lines.alignedDur;
+                setOfflineLyrics(t, L);
                 return;
               }
               dbg('LRC descartado por idioma: "' + String(t.title || '').slice(0, 36) + '"');
@@ -3761,13 +3815,7 @@
         return !(langP && langL && langP !== langL);
       };
       const g = api();
-      if (g && g.fetchLetras) {
-        try {
-          const r = await g.fetchLetras({ artist: t.artist, title: tituloBase(t.title) || t.title });
-          const txt = r && r.ok ? String(r.text || '').trim() : '';
-          if (sirve(txt)) return { text: txt, source: 'letras.com' };
-        } catch (e) { /* 403 o sin resultado: se prueba el respaldo */ }
-      }
+      // 1) lyrics.ovh primero (más fiable: no tiene páginas de error ni letras de otra canción)
       try {
         const ctrl = new AbortController();
         const to = setTimeout(() => ctrl.abort(), 8000);
@@ -3781,6 +3829,14 @@
           if (sirve(txt)) return { text: txt, source: 'lyrics.ovh' };
         }
       } catch (e) { /* sin red o sin resultado */ }
+      // 2) letras.com como respaldo (puede devolver 403 o letra de otra canción)
+      if (g && g.fetchLetras) {
+        try {
+          const r = await g.fetchLetras({ artist: t.artist, title: tituloBase(t.title) || t.title });
+          const txt = r && r.ok ? String(r.text || '').trim() : '';
+          if (sirve(txt)) return { text: txt, source: 'letras.com' };
+        } catch (e) { /* 403 o sin resultado */ }
+      }
       return null;
     })();
     return t._refPromise;
@@ -3803,7 +3859,10 @@
     }
     const sim = textoParecido(texto, ref.text);
     if (sim === null) return true;
-    if (sim < 0.45) {
+    // Solo se descarta si la letra es CLARAMENTE de otra canción (similitud muy baja).
+    // Un umbral alto causaba falsos positivos con letras.com (devuelve 403 o
+    // letras de otra canción con el mismo título).
+    if (sim < 0.3) {
       dbg('letra local descartada [' + String(t.title || '').slice(0, 32) + '] no coincide con ' +
           ref.source + ' (parecido=' + sim.toFixed(2) + ')');
       return false;
@@ -4213,7 +4272,7 @@
         if (g2 && g2.saveLrc && fp2) {
           let lrcText = '';
           if (t.lyrics.type === 'synced' && Array.isArray(t.lyrics.lines)) {
-            lrcText = t.lyrics.lines.map(l => {
+            lrcText = (t.lyrics.estimated ? '[re:avance aproximado]\n' : '') + t.lyrics.lines.map(l => {
               const sec = Number(l.t) || 0;
               const m = Math.floor(sec / 60);
               const s = (sec % 60).toFixed(2).padStart(5, '0');
@@ -4239,6 +4298,11 @@
     }
     t.lyricState = 'done';
     t._voiceSkipUntil = 0;      // la letra pudo cambiar: permitir alinear con la voz
+    // Notificar al usuario la fuente de la letra descargada
+    const src = t.lyrics && t.lyrics.source ? t.lyrics.source : '';
+    if (src && state.tracks[state.index] === t) {
+      toast('Letra descargada de ' + src, 3000);
+    }
     dbg('letra lista "' + (t.title || '').slice(0, 40) + '" tipo=' + (t.lyrics && t.lyrics.type) +
         ' lineas=' + (t.lyrics && t.lyrics.lines ? t.lyrics.lines.length : 0) +
         ' estimada=' + !!(t.lyrics && t.lyrics.estimated) +
@@ -4247,6 +4311,64 @@
   }
 
   // Letra sin tiempos → estimación ponderada por longitud de línea.
+  // Desplaza manualmente TODAS las líneas de la letra actual ±segundos.
+  // Las marcas se guardan ya desplazadas en el .lrc (sin [offset], para no
+  // aplicarlo dos veces al volver a cargar).
+  function shiftLyrics(delta) {
+    const t = state.tracks[state.index];
+    if (!t || !t.lyrics) return;
+    const L = t.lyrics;
+    if (L.type !== 'synced' || !Array.isArray(L.lines) || !L.lines.length) return;
+    const d = Number(delta) || 0;
+    const wasAligned = !!L.voiceAligned;
+    L.lines = L.lines.map(ln => {
+      const o = Object.assign({}, ln, { t: Math.max(0, (+ln.t) + d) });
+      if (isFinite(+ln.end)) o.end = Math.max(o.t + 0.1, (+ln.end) + d);
+      if (Array.isArray(ln.words)) o.words = ln.words.map(w => Object.assign({}, w, { t: Math.max(0, (+w.t) + d) }));
+      return o;
+    });
+    L.voiceShift = (L.voiceShift || 0) + d;
+    L.voiceRefined = true;
+    L.voiceSnap = false;
+    // Si la letra estaba alineada con la voz se conserva la marca para no
+    // volver a analizarla; si era aproximada, se dejará re-alinear sola.
+    L.voiceAligned = wasAligned && !L.estimated;
+    if (!L.estimated) {
+      L.fileSig = fileSigOf(t, durSec(t));
+      if (L.voiceAligned) L.alignedDur = Math.round(durSec(t) || 0) || undefined;
+    }
+    saveCachedLyrics(lyricKey(t), {
+      v: 3, vr: 3, type: 'synced', lines: L.lines, dur: durSec(t), source: L.source,
+      estimated: !!L.estimated,
+      voiceAligned: !!L.voiceAligned, voiceRefined: true, voiceShift: L.voiceShift,
+      alignedDur: L.alignedDur,
+      fileSig: fileSigOf(t, durSec(t))
+    });
+    // Guardar el .lrc con las marcas ya desplazadas.
+    try {
+      const g = window.playerAPI;
+      const fp = t.path || (g && g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
+      if (g && g.saveLrc && fp) {
+        const tags = [];
+        if (L.estimated) tags.push('[re:avance aproximado]');
+        else if (L.voiceAligned) {
+          tags.push('[re:alineada-voz]');
+          if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
+        }
+        const lrcText = (tags.length ? tags.join('\n') + '\n' : '') +
+          L.lines.map(l => {
+            const sec = Math.max(0, Number(l.t) || 0);
+            const m = Math.floor(sec / 60);
+            const s = (sec % 60).toFixed(2).padStart(5, '0');
+            return '[' + String(m).padStart(2, '0') + ':' + s + ']' + (l.text || '');
+          }).join('\n');
+        g.saveLrc(fp, lrcText).catch(() => {});
+      }
+    } catch (e) { }
+    if (state.tracks[state.index] === t) renderLyrics();
+    toast('Desfase ajustado: ' + (L.voiceShift >= 0 ? '+' : '') + L.voiceShift.toFixed(1) + ' s', 2000);
+  }
+
   // Es solo el respaldo: si el audio se puede analizar, se alinea a la voz real.
   function ensureTimed(t) {
     const L = t.lyrics;
@@ -4416,6 +4538,56 @@
     }
   }
 
+  // Peso silábico aproximado de una palabra (grupos de vocales). Sirve para
+  // repartir palabra a palabra cuando el LRC no trae marcas <mm:ss.xx>.
+  function syllableWeight(w) {
+    const s = String(w || '').toLowerCase().replace(/[^a-záéíóúüñçàèìòùâêîôûãõ]/g, '');
+    const g = s.match(/[aeiouyáéíóúüàèìòùâêîôûãõ]+/g);
+    return Math.max(1, g ? g.length : Math.ceil(s.length / 3));
+  }
+
+  // Reparte las palabras de una línea sobre los ataques de voz detectados.
+  // Solo se usa si hay ataques suficientes; si no, paintWords reparte por
+  // duración. Así el resaltado por palabra sigue al cantante, no al reloj.
+  function wordsFromOnsets(text, start, end, onsets) {
+    const parts = String(text || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length < 2) return null;
+    if (!(end > start + 0.3)) return null;
+    const ons = (onsets || []).filter(o => o >= start - 0.05 && o <= end + 0.05);
+    if (ons.length < Math.max(2, Math.ceil(parts.length * 0.6))) return null;
+    const ws = parts.map(syllableWeight);
+    const total = ws.reduce((a, b) => a + b, 0) || 1;
+    const out = [];
+    let acc = 0, prev = -Infinity;
+    for (let i = 0; i < parts.length; i++) {
+      let t = start + (end - start) * (acc / total);
+      if (i === 0) {
+        t = start;                                  // empieza cuando empieza el canto
+      } else {
+        let best = t, bestD = Infinity;
+        const lo = Math.max(prev + 0.08, t - 0.45);
+        const hi = Math.min(end, t + 0.45);
+        for (let k = 0; k < ons.length; k++) {
+          const o = ons[k];
+          if (o < lo || o > hi) continue;
+          const d = Math.abs(o - t);
+          if (d < bestD) { bestD = d; best = o; }
+        }
+        t = best;
+      }
+      if (!(t > prev)) t = prev + 0.08;
+      out.push({ t, text: parts[i] });
+      prev = t;
+      acc += ws[i];
+    }
+    for (let i = 0; i < out.length; i++) {
+      out[i].end = i + 1 < out.length
+        ? Math.max(out[i].t + 0.08, out[i + 1].t)
+        : Math.max(out[i].t + 0.2, end);
+    }
+    return out;
+  }
+
   // Reparte las líneas de una letra simple entre las frases vocales detectadas.
   // Una línea tarda un tiempo proporcional a su texto; se reparten los grupos
   // entre las frases según la duración cantada (sin la cola instrumental) y luego
@@ -4423,8 +4595,13 @@
   // larga no se lleva las líneas de la estrofa siguiente.
   function alignPlainToVoice(t, A) {
     const L = t.lyrics;
-    if (!L || !L.text) return;
-    const rows = L.text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    if (!L) return;
+    // Puede llegar sin L.text (p. ej. un LRC aproximado leído del disco): en ese
+    // caso se reconstruye el texto con las líneas que ya tiene el LRC.
+    const fuente = (L.text && String(L.text).trim())
+      ? String(L.text)
+      : (Array.isArray(L.lines) ? L.lines.map(l => String(l.text || '')).join('\n') : '');
+    const rows = fuente.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
     const N = rows.length;
     if (N < 2) return;
     let phrases = (A.phrases || [])
@@ -4466,6 +4643,7 @@
     }
 
     const lines = [];
+    const onsetsAll = (A.onsets || []).filter(x => isFinite(x)).sort((a, b) => a - b);
     let idx = 0;
     for (let i = 0; i < phrases.length && idx < N; i++) {
       const c = Math.min(counts[i], N - idx);
@@ -4475,40 +4653,43 @@
       idx += c;
       const weights = chunk.map(x => Math.max(3, x.replace(/[\s\p{P}]/gu, '').length + 1));
       const sum = weights.reduce((a, b) => a + b, 0) || 1;
+      // Ataques de voz dentro de esta frase: cada línea empieza en uno de ellos
+      // (la primera, exactamente cuando empieza la frase cantada).
+      const ons = onsetsAll.filter(o => o >= p.t - 0.05 && o <= p.end + 0.05);
+      const starts = [];
       let acc = 0;
-      chunk.forEach((text, j) => {
-        const durP = p.eff || (p.end - p.t);
-        const a = p.t + durP * (acc / sum);
+      for (let j = 0; j < c; j++) {
+        if (j === 0) {
+          starts.push(p.t);
+        } else {
+          const ideal = p.t + (p.end - p.t) * (acc / sum);
+          let best = ideal, bestD = Infinity;
+          const lo = Math.max(starts[j - 1] + 0.3, ideal - 1.2);
+          const hi = Math.min(p.end, ideal + 1.2);
+          for (let k = 0; k < ons.length; k++) {
+            const o = ons[k];
+            if (o < lo || o > hi) continue;
+            const d = Math.abs(o - ideal);
+            if (d < bestD) { bestD = d; best = o; }
+          }
+          starts.push(best);
+        }
         acc += weights[j];
-        const b = p.t + durP * (acc / sum);
-        lines.push({ t: a, end: Math.max(a + 0.15, b), text });
-      });
+      }
+      for (let j = 0; j < c; j++) {
+        const t0 = starts[j];
+        const end = j + 1 < c ? Math.max(t0 + 0.2, starts[j + 1]) : Math.max(t0 + 0.3, p.end);
+        const line = { t: t0, end, text: chunk[j] };
+        const words = wordsFromOnsets(chunk[j], t0, end, ons);
+        if (words) line.words = words;
+        lines.push(line);
+      }
     }
     // Si quedaron líneas sin frase (caso extremo), se añaden al final.
     while (idx < N) {
       const lastT = lines.length ? lines[lines.length - 1].end : 0;
       lines.push({ t: lastT, end: lastT + Math.max(0.6, Math.min(2.5, rows[idx].length * 0.06)), text: rows[idx] });
       idx++;
-    }
-    // Se alinea cada línea al ataque de voz más cercano (dentro de ±1.5 s y de forma
-    // creciente) para no quedarse pegada a un borde de frase o a un silencio.
-    const onsets = (A.onsets || []).filter(x => isFinite(x)).sort((a, b) => a - b);
-    if (onsets.length) {
-      let prevT = -1;
-      for (let i = 0; i < lines.length; i++) {
-        const target = lines[i].t;
-        const lo = Math.max(prevT + 0.25, target - 1.5);
-        const hi = target + 1.5;
-        let bestT = lines[i].t, bestD = Infinity;
-        for (let k = 0; k < onsets.length; k++) {
-          const ot = onsets[k];
-          if (ot < lo || ot > hi) continue;
-          const dd = Math.abs(ot - target);
-          if (dd < bestD) { bestD = dd; bestT = ot; }
-        }
-        if (bestD < Infinity) { lines[i].t = bestT; }
-        prevT = lines[i].t;
-      }
     }
     for (let i = 1; i < lines.length; i++) {
       if (lines[i].t < lines[i - 1].t) lines[i].t = lines[i - 1].t;
@@ -4556,44 +4737,47 @@
     // ataque de voz. Esto cubre los casos en que la letra empieza tarde o
     // temprano respecto al canto (p. ej. un intro instrumental largo).
     if (evL.length < 4 || evA.length < 3) {
+      // Pocas pausas: se intenta un ajuste por primer onset, pero SOLO si la
+      // primera línea está claramente desplazada (>= 2 s respecto al primer canto).
+      // Esto evita tocar canciones que ya sincronizan bien.
       const firstOnset = phrases.length ? phrases[0].t : null;
       const firstLine = times.length ? times[0] : null;
       if (firstOnset !== null && firstLine !== null &&
-          Math.abs(firstLine - firstOnset) >= 1.5 &&
-          Math.abs(firstLine - firstOnset) <= 30) {
-        const shift = firstOnset - firstLine;
-        // Solo aplicar si no deja la primera línea en negativo
-        if (times[0] + shift >= 0) {
-          L.lines = L.lines.map(ln => {
-            const o = Object.assign({}, ln, { t: Math.max(0, (+ln.t) + shift) });
-            if (isFinite(+ln.end)) o.end = Math.max(o.t + 0.1, (+ln.end) + shift);
-            if (Array.isArray(ln.words)) o.words = ln.words.map(w => Object.assign({}, w, { t: Math.max(0, (+w.t) + shift) }));
-            return o;
-          });
-          L.voiceShift = Math.round(shift * 100) / 100;
-          L.voiceRefined = true;
-          L.voiceSnap = false;
-          // Guardar el .lrc corregido
-          try {
-            const g = window.playerAPI;
-            const fp = t.path || (g && g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
-            if (g && g.saveLrc && fp) {
-              const lrcText = L.lines.map(l => {
-                const sec = Math.max(0, Number(l.t) || 0);
-                const m = Math.floor(sec / 60);
-                const s = (sec % 60).toFixed(2).padStart(5, '0');
-                return '[' + String(m).padStart(2, '0') + ':' + s + ']' + (l.text || '');
-              }).join('\n');
-              g.saveLrc(fp, lrcText).catch(() => {});
-            }
-          } catch (e) { }
-          dbg('voz: ajuste por primer onset [' + title + '] ' + shift.toFixed(1) + 's');
-          return true;
-        }
+          Math.abs(firstLine - firstOnset) >= 2.0 &&
+          Math.abs(firstLine - firstOnset) <= 20 &&
+          firstLine + (firstOnset - firstLine) >= 0) {
+        const sh = firstOnset - firstLine;
+        L.lines = L.lines.map(ln => {
+          const o = Object.assign({}, ln, { t: Math.max(0, (+ln.t) + sh) });
+          if (isFinite(+ln.end)) o.end = Math.max(o.t + 0.1, (+ln.end) + sh);
+          if (Array.isArray(ln.words)) o.words = ln.words.map(w => Object.assign({}, w, { t: Math.max(0, (+w.t) + sh) }));
+          return o;
+        });
+        L.voiceShift = Math.round(sh * 100) / 100;
+        L.voiceRefined = true;
+        L.voiceSnap = false;
+        try {
+          const g = window.playerAPI;
+          const fp = t.path || (g && g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
+          if (g && g.saveLrc && fp) {
+            const lrcText = L.lines.map(l => {
+              const sec = Math.max(0, Number(l.t) || 0);
+              const m = Math.floor(sec / 60);
+              const s = (sec % 60).toFixed(2).padStart(5, '0');
+              return '[' + String(m).padStart(2, '0') + ':' + s + ']' + (l.text || '');
+            }).join('\n');
+            g.saveLrc(fp, lrcText).catch(() => {});
+          }
+        } catch (e) { }
+        dbg('voz: ajuste por primer onset [' + title + '] ' + sh.toFixed(1) + 's (pocas pausas)');
+        return true;
       }
       dbg('voz LRC [' + title + '] sin pausas claras → LRC conservado');
       return false;
     }
+
+    // Si las pausas no son suficientes para el método principal, no se corrige.
+    // La letra se deja intacta para no empeorarla.
 
     // Nº de eventos de letra que caen sobre un inicio de frase vocal con desfase sh.
     const score = (arr, sh) => {
@@ -4622,6 +4806,16 @@
     const shift = best.sh;
     const bestS = best.s;
     const gain = bestS - s0;
+    // Si la letra ya coincide bien (s0 alto), no se corrige
+    if (s0 >= evL.length * 0.6) {
+      dbg('voz: LRC ya coincide con el audio [' + title + '] (s0=' + s0 + '/' + evL.length + ')');
+      return false;
+    }
+    // Si el desfase no mejora la coincidencia, no se aplica (evita empeorar)
+    if (gain <= 0) {
+      dbg('voz: LRC conservado [' + title + '] el desfase no mejora (s0=' + s0 + ', best=' + bestS + ')');
+      return false;
+    }
     const mid = (A.duration || durSec(t) || 0) / 2;
     const evL1 = evL.filter(x => x < mid);
     const evL2 = evL.filter(x => x >= mid);
@@ -4692,6 +4886,14 @@
     // volver a analizar contra el audio actual.
     const curFileSig = fileSigOf(t, durSec(t));
     if ((L.voiceAligned || L.voiceRefined || L.voiceSnap) && curFileSig && L.fileSig === curFileSig) return;
+    // LRC ya alineado con la voz para este mismo audio: no hace falta volver a
+    // analizarlo ni arriesgarse a que un refinamiento posterior lo mueva.
+    const durNow = durSec(t);
+    if (L.voiceAligned && isFinite(L.alignedDur) && durNow &&
+        Math.abs(L.alignedDur - durNow) <= 2) {
+      L.fileSig = curFileSig;
+      return;
+    }
     if (t._voiceBusy || Date.now() < (t._voiceSkipUntil || 0)) return;
     const g = window.playerAPI;
     if (!g || !g.readAudio) return;
@@ -4722,10 +4924,26 @@
         if (!cur || cur.type === 'none' || cur.type === 'credits') return;
         const curFileSig2 = fileSigOf(t, durSec(t));
         if ((cur.voiceAligned || cur.voiceRefined || cur.voiceSnap) && curFileSig2 && cur.fileSig === curFileSig2) return;
-        if (cur.type === 'plain') { cur.voiceAligned = false; alignPlainToVoice(t, A); }
+        // Un LRC "aproximado" (tiempos repartidos por largo de línea) también se
+        // re-alinea con las frases y ataques de voz. Antes caía en la rama de LRC
+        // ya sincronizado y solo se le podía aplicar un desfase global, así que la
+        // letra seguía avanzando a reloj y no con el cantante.
+        const aprox = !!cur.estimated ||
+          (!cur.voiceAligned && cur.type === 'synced' && looksEstimatedTimes(cur.lines));
+        if (cur.type === 'plain' || aprox) {
+          cur.estimated = true;
+          cur.voiceAligned = false;
+          alignPlainToVoice(t, A);
+        }
         else if (cur.type === 'synced') {
+          cur.voiceAligned = false;
           cur.voiceRefined = false; cur.voiceShift = undefined; cur.voiceSnap = false;
           refineSyncedToVoice(t, A);
+        }
+        if (cur.voiceAligned || cur.voiceRefined || cur.voiceSnap) {
+          // Guardar la firma en memoria: evita repetir el análisis en cada render.
+          cur.fileSig = fileSigOf(t, durSec(t));
+          if (cur.voiceAligned) cur.alignedDur = Math.round(durSec(t) || 0) || undefined;
         }
         if (!cur.voiceAligned && !cur.voiceRefined && !cur.voiceSnap) {
           t._voiceSkipUntil = Date.now() + 180000;      // no repetir el análisis
@@ -4737,6 +4955,7 @@
           if (cur.type === 'synced' && Array.isArray(cur.lines) && cur.lines.length >= 3) {
             saveCachedLyrics(lyricKey(t), {
               v: 3, vr: 3, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
+              estimated: !!cur.estimated,
               voiceAligned: false, voiceRefined: false,
               fileSig: fileSigOf(t, durSec(t))
             });
@@ -4746,7 +4965,9 @@
         cur.offline = true;
         saveCachedLyrics(lyricKey(t), {
           v: 3, vr: 3, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
+          estimated: !!cur.estimated,
           voiceAligned: !!cur.voiceAligned, voiceRefined: !!cur.voiceRefined, voiceSnap: !!cur.voiceSnap,
+          alignedDur: cur.alignedDur,
           fileSig: fileSigOf(t, durSec(t))
         });
         // La alineación de una letra simple también se guarda con tiempos junto
@@ -4755,7 +4976,8 @@
             Array.isArray(cur.lines) && cur.lines.length >= 3) {
           try {
             const fpLrc = fp.replace(/\.[^.]+$/, '') + '.lrc';
-            g.saveLrc(fpLrc, cur.lines.map(l => {
+            const durTag = durSec(t) ? '[length:' + Math.round(durSec(t)) + ']\n' : '';
+            g.saveLrc(fpLrc, '[re:alineada-voz]\n' + durTag + cur.lines.map(l => {
               const sec = Math.max(0, Number(l.t) || 0);
               const m = Math.floor(sec / 60);
               const s = (sec % 60).toFixed(2).padStart(5, '0');
@@ -4973,7 +5195,14 @@
     const now = (media && isFinite(media.currentTime)) ? media.currentTime : 0;
 
     let idx = -1;
-    for (let i = 0; i < lines.length; i++) { if (lines[i].t <= now + .05) idx = i; else break; }
+    // Búsqueda binaria (O(log n)) en vez de lineal (O(n)) para encontrar
+    // la línea de letra correspondiente al tiempo actual del audio.
+    let lo = 0, hi = lines.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (lines[mid].t <= now + .05) { idx = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
     const box = $('lyricsBox');
     const el = idx >= 0 ? box.querySelector(`.ly[data-i="${idx}"]`) : null;
     if (idx === state.lastLyricIdx && !force) { paintWords(el, lines, idx, now); return; }
@@ -5297,6 +5526,23 @@
   /* ================= Archivos ================= */
   $('btnAddFiles').onclick = () => $('fileAudio').click();
   $('btnAddDir').onclick = () => $('fileDir').click();
+  $('btnUpdate').onclick = async () => {
+    const g = window.playerAPI;
+    if (!g || !g.checkForUpdates) { toast('Actualizaciones no disponibles', 3000); return; }
+    toast('Buscando actualizaciones…', 2000);
+    try {
+      const r = await g.checkForUpdates();
+      if (r && r.ok && r.version) {
+        toast('Hay una actualización disponible: v' + r.version + '. Se descargará automáticamente.', 6000);
+      } else if (r && r.ok) {
+        toast('Ya tienes la última versión.', 3000);
+      } else {
+        toast('No se pudo comprobar: ' + (r && r.error || 'sin conexión'), 4000);
+      }
+    } catch (e) {
+      toast('Error al comprobar actualizaciones', 3000);
+    }
+  };
   $('fileAudio').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
   $('fileDir').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
   $('drop').onclick = () => $('fileAudio').click();
@@ -5322,7 +5568,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  const APP_VERSION = '1.9.6';
+  const APP_VERSION = '2.1.2';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
 
   // Punto del indicador de conexión de la barra superior
@@ -5394,8 +5640,8 @@
     if (typing) return;
     switch (e.key) {
       case ' ': e.preventDefault(); togglePlay(); break;
-      case 'ArrowRight': e.preventDefault(); media.currentTime = Math.min(media.duration || 0, media.currentTime + 10); break;
-      case 'ArrowLeft': e.preventDefault(); media.currentTime = Math.max(0, media.currentTime - 10); break;
+      case 'ArrowRight': if (e.ctrlKey) { e.preventDefault(); shiftLyrics(0.5); break; } e.preventDefault(); media.currentTime = Math.min(media.duration || 0, media.currentTime + 10); break;
+      case 'ArrowLeft': if (e.ctrlKey) { e.preventDefault(); shiftLyrics(-0.5); break; } e.preventDefault(); media.currentTime = Math.max(0, media.currentTime - 10); break;
       case 'ArrowUp': e.preventDefault(); vol.value = clamp(+vol.value + .05, 0, 1); vol.oninput(); break;
       case 'ArrowDown': e.preventDefault(); vol.value = clamp(+vol.value - .05, 0, 1); vol.oninput(); break;
       case 'n': case 'N': nextTrack(); break;
@@ -5439,6 +5685,19 @@
   // Verificar la conexión real y reintentar periódicamente
   probeConnection();
   setInterval(() => { probeConnection(); }, 60000);
+
+  // Notificar al usuario cuando hay una actualización disponible
+  const g = window.playerAPI;
+  if (g && g.onUpdateAvailable) {
+    g.onUpdateAvailable((version) => {
+      toast('Hay una actualización disponible (v' + version + '). Se descargará en segundo plano.', 6000);
+    });
+  }
+  if (g && g.onUpdateDownloaded) {
+    g.onUpdateDownloaded((version) => {
+      toast('Actualización v' + version + ' lista. Se instalará al cerrar la app.', 8000);
+    });
+  }
   window.addEventListener('beforeunload', () => {
     savePlaylist();                     // guardado final al salir
     state.tracks.forEach(t => { if (t.url && t.url.startsWith('blob:')) URL.revokeObjectURL(t.url); });

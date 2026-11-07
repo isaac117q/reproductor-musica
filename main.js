@@ -2,6 +2,25 @@ const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
+
+// Configurar auto-updater: notificar al usuario cuando hay actualización
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+// Eventos del auto-updater para notificar a la ventana
+autoUpdater.on('update-available', (info) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-available', info.version);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-downloaded', info.version);
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('autoUpdater error:', err && err.message || err);
+});
 const fsp = fs.promises;
 
 let mainWindow = null;
@@ -577,20 +596,21 @@ app.on('web-contents-created', (_e, contents) => {
 
 app.whenReady().then(() => {
   createWindow();
-  // Comprobar actualizaciones automáticamente al abrir la app.
-  // Si hay versión nueva en GitHub Releases, se descarga y se instala al cerrar.
-  try {
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.checkForUpdatesAndNotify();
-  } catch (e) {
-    console.error('autoUpdater:', e && e.message || e);
-  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+// IPC para actualizaciones
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { ok: true, version: result && result.updateInfo ? result.updateInfo.version : null };
+  } catch (e) {
+    return { ok: false, error: e && e.message || String(e) };
+  }
+});
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall();
 });

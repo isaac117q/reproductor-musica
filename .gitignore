@@ -1,3 +1,8 @@
 node_modules/
 dist/
 *.log
+
+# Archivos ajenos al reproductor
+.codegraph/
+lavanderia.*
+test-meyda.js

@@ -1,6 +1,6 @@
 {
   "name": "reproductor-musica",
-  "version": "1.9.6",
+  "version": "2.1.2",
   "description": "Reproductor de música para Windows",
   "main": "main.js",
   "scripts": {
@@ -22,7 +22,8 @@
     "publish": {
       "provider": "github",
       "owner": "isaac117q",
-      "repo": "reproductor-musica"
+      "repo": "reproductor-musica",
+      "releaseType": "release"
     },
     "files": [
       "main.js",
@@ -53,6 +54,7 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.11"
+    "electron-updater": "^6.8.11",
+    "meyda": "^5.6.3"
   }
 }

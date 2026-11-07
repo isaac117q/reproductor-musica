@@ -32,5 +32,11 @@ contextBridge.exposeInMainWorld('playerAPI', {
   debugLog: (msg) => ipcRenderer.invoke('debug-log', String(msg || '')).catch(() => {}),
 
   // Colores de la barra de título nativa según el tema activo
-  setTitleBarColors: (colors) => ipcRenderer.send('titlebar-colors', colors)
+  setTitleBarColors: (colors) => ipcRenderer.send('titlebar-colors', colors),
+
+  // Actualizaciones autom�ticas
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (e, v) => cb(v)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (e, v) => cb(v))
 });
