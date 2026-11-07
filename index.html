@@ -354,6 +354,7 @@
   .ly-sync.warn .dot { background: #f0a020; box-shadow: 0 0 6px rgba(240,160,32,.75); }
   .ly-sync.bad { border-color: var(--danger); }
   .ly-sync.bad .dot { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+  .ly-sync.na { border-style: dashed; opacity: .85; }
   .ly.dim { color: var(--ly-dim); font-weight: 600; font-size: 19px; }
   .ly-note { font-size: 14.5px; font-weight: 500; color: var(--muted); line-height: 1.65; letter-spacing: 0; }
   .lyrics::-webkit-scrollbar { width: 0; }
@@ -3488,7 +3489,7 @@
       dur: d.dur, estimated: d.estimated, vr: d.vr, verified: d.verified,
       voiceAligned: d.voiceAligned, voiceRefined: d.voiceRefined, voiceSnap: d.voiceSnap,
       voiceWords: d.voiceWords, voiceShift: d.voiceShift,
-      syncInfo: d.syncInfo,
+      syncInfo: d.syncInfo, syncNA: d.syncNA,
       fileSig: d.fileSig, alignedDur: d.alignedDur
     };
     if (Array.isArray(d.lines) && d.lines.length) return { type: 'synced', lines: d.lines, source: d.source, ...extra };
@@ -5135,7 +5136,7 @@
     // El indicador vive en la letra, así que basta con tenerlo guardado.
     const curFileSig = fileSigOf(t, durSec(t));
     const durNow = durSec(t);
-    if (L.syncInfo && curFileSig && L.fileSig === curFileSig) return;
+    if ((L.syncInfo || L.syncNA) && curFileSig && L.fileSig === curFileSig) return;
     // .lrc del disco ya medido para esta misma duración: tampoco se repite.
     if (L.syncInfo && isFinite(L.alignedDur) && durNow &&
         Math.abs(L.alignedDur - durNow) <= 2) {
@@ -5164,6 +5165,12 @@
         if (!A) { t._voiceSkipUntil = Date.now() + 120000; dbg('análisis de voz: tiempo agotado'); return; }
         if (!A || !A.phrases || !A.phrases.length) {
           t._voiceSkipUntil = Date.now() + 120000;      // audio no analizable
+          // Sin voz detectable no se puede medir: el indicador lo dice en vez de
+          // desaparecer sin explicación.
+          if (t.lyrics && t.lyrics.type === 'synced') {
+            t.lyrics.syncNA = true;
+            if (state.tracks[state.index] === t) renderLyrics();
+          }
           return;
         }
         // Se aplica a la letra VIGENTE: entre la petición y el análisis puede
@@ -5171,37 +5178,45 @@
         const cur = t.lyrics;
         if (!cur || cur.type === 'none' || cur.type === 'credits') return;
         const curFileSig2 = fileSigOf(t, durSec(t));
-        if ((cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) &&
-            curFileSig2 && cur.fileSig === curFileSig2 && hasVoiceWords(cur)) return;
-        // Un LRC "aproximado" (tiempos repartidos por largo de línea) también se
-        // re-alinea con las frases y ataques de voz. Antes caía en la rama de LRC
-        // ya sincronizado y solo se le podía aplicar un desfase global, así que la
-        // letra seguía avanzando a reloj y no con el cantante.
-        const aprox = !!cur.estimated ||
-          (!cur.voiceAligned && cur.type === 'synced' && looksEstimatedTimes(cur.lines));
-        if (cur.type === 'plain' || aprox) {
-          cur.estimated = true;
-          cur.voiceAligned = false;
-          alignPlainToVoice(t, A);
-        }
-        else if (cur.type === 'synced') {
-          if ((cur.voiceAligned || cur.voiceRefined) && !cur.estimated) {
-            // Ya estaba pegada a la voz (p. ej. un .lrc etiquetado): solo se
-            // añaden las palabras, sin volver a tocar los tiempos de línea.
-            refineWordsToVoice(t, A);
-          } else {
-            // Si esta letra ya tenía un desfase aplicado (automático o con
-            // Ctrl+←/→), NO se borra: volver a buscar otro desplazamiento podía
-            // acumular correcciones y dejar el LRC cada vez más desviado.
-            if (!(cur.voiceRefined && isFinite(+cur.voiceShift))) {
-              cur.voiceAligned = false;
-              cur.voiceSnap = false;
-              refineSyncedToVoice(t, A);
+        // Letra ya pegada a la voz y con marcas por palabra para este mismo
+        // audio: no se vuelve a tocar. Antes se salía aquí sin medir la
+        // sincronía, y por eso las letras corregidas en versiones anteriores se
+        // quedaban sin indicador. Ahora solo se salta la corrección, no la
+        // medición: si falta el resultado, se calcula más abajo.
+        const yaPegada = (cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) &&
+          curFileSig2 && cur.fileSig === curFileSig2 && hasVoiceWords(cur);
+        if (yaPegada && (cur.syncInfo || cur.syncNA)) return;
+        if (!yaPegada) {
+          // Un LRC "aproximado" (tiempos repartidos por largo de línea) también se
+          // re-alinea con las frases y ataques de voz. Antes caía en la rama de LRC
+          // ya sincronizado y solo se le podía aplicar un desfase global, así que la
+          // letra seguía avanzando a reloj y no con el cantante.
+          const aprox = !!cur.estimated ||
+            (!cur.voiceAligned && cur.type === 'synced' && looksEstimatedTimes(cur.lines));
+          if (cur.type === 'plain' || aprox) {
+            cur.estimated = true;
+            cur.voiceAligned = false;
+            alignPlainToVoice(t, A);
+          }
+          else if (cur.type === 'synced') {
+            if ((cur.voiceAligned || cur.voiceRefined) && !cur.estimated) {
+              // Ya estaba pegada a la voz (p. ej. un .lrc etiquetado): solo se
+              // añaden las palabras, sin volver a tocar los tiempos de línea.
+              refineWordsToVoice(t, A);
+            } else {
+              // Si esta letra ya tenía un desfase aplicado (automático o con
+              // Ctrl+←/→), NO se borra: volver a buscar otro desplazamiento podía
+              // acumular correcciones y dejar el LRC cada vez más desviado.
+              if (!(cur.voiceRefined && isFinite(+cur.voiceShift))) {
+                cur.voiceAligned = false;
+                cur.voiceSnap = false;
+                refineSyncedToVoice(t, A);
+              }
+              // Aunque el LRC no necesite desfase, sus líneas no traen tiempos por
+              // palabra: se pegan a los ataques de voz para que el resaltado siga al
+              // cantante dentro de cada línea.
+              refineWordsToVoice(t, A);
             }
-            // Aunque el LRC no necesite desfase, sus líneas no traen tiempos por
-            // palabra: se pegan a los ataques de voz para que el resaltado siga al
-            // cantante dentro de cada línea.
-            refineWordsToVoice(t, A);
           }
         }
         // Un LRC que ya traía marcas por palabra también cuenta como corregido:
@@ -5212,10 +5227,17 @@
         // letra a la voz, si hacía falta). El resultado solo informa: no mueve
         // ninguna línea. Se guarda con la letra para no reanalizar el audio.
         const info = voiceSyncInfo(cur, A, durSec(t));
-        if (info) cur.syncInfo = info;
+        if (info) {
+          cur.syncInfo = info;
+          cur.syncNA = false;
+        } else if (cur.type === 'synced') {
+          // No hubo datos suficientes (pocas frases vocales): se marca para que
+          // el indicador muestre "sin datos" en vez de no aparecer.
+          cur.syncNA = true;
+        }
 
         // Guardar la firma y la duración: evita repetir el análisis en cada render.
-        if (info || cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) {
+        if (info || cur.syncNA || cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) {
           cur.fileSig = curFileSig2;
         }
         if (info || cur.voiceAligned) {
@@ -5237,9 +5259,11 @@
               voiceWords: !!cur.voiceWords,
               alignedDur: cur.alignedDur,
               syncInfo: cur.syncInfo,
+              syncNA: !!cur.syncNA,
               fileSig: fileSigOf(t, durSec(t))
             });
           }
+          if (state.tracks[state.index] === t) { renderLyrics(); }
           return;
         }
         cur.offline = true;
@@ -5251,6 +5275,7 @@
           voiceWords: !!cur.voiceWords,
           alignedDur: cur.alignedDur,
           syncInfo: cur.syncInfo,
+          syncNA: !!cur.syncNA,
           fileSig: fileSigOf(t, durSec(t))
         });
         // Guardar el LRC junto al audio con las etiquetas (palabras, desfase y
@@ -5311,6 +5336,12 @@
   // no hay botón ni corrige nada. El detalle completo va en el tooltip.
   function syncBadgeHtml(L) {
     const s = L && L.syncInfo;
+    // El audio no dio frases vocales suficientes: se informa en vez de dejar la
+    // cabecera sin indicador (parecía que el analizador no funcionaba).
+    if (L && L.syncNA && (!s || !isFinite(+s.pct))) {
+      return '<span class="ly-sync na" title="No se pudo medir la voz en esta canción; la letra se muestra igual">' +
+        '<i class="dot"></i>Sin datos de voz</span>';
+    }
     if (!s || !isFinite(+s.pct)) return '';
     const pct = Math.max(0, Math.min(100, Math.round(+s.pct)));
     const off = Number(s.offset) || 0;
@@ -5953,7 +5984,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.2.2';
+  let APP_VERSION = '2.2.3';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
