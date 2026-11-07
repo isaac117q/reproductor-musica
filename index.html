@@ -6095,12 +6095,12 @@
       label.textContent =
         updState.status === 'checking' ? 'Buscando…' :
         updState.status === 'downloading' ? 'Descargando ' + updState.percent + ' %' :
-        updState.status === 'ready' ? (updState.version ? 'Lista v' + updState.version : 'Lista para actualizar') :
+        updState.status === 'ready' ? (updState.version ? 'Instalar v' + updState.version : 'Instalar') :
         'Actualizar';
     }
     if (dot) dot.style.display = has ? 'block' : 'none';
     btn.title =
-      updState.status === 'ready' ? 'Actualización v' + updState.version + ' lista · se instala al cerrar la app' :
+      updState.status === 'ready' ? 'Actualización v' + updState.version + ' lista · pulsa para instalar y reiniciar la app' :
       updState.status === 'downloading' ? 'Descargando actualización v' + updState.version + '… ' + updState.percent + ' %' :
       updState.status === 'available' ? 'Hay una actualización v' + updState.version + ' disponible' :
       updState.status === 'checking' ? 'Buscando actualizaciones…' :
@@ -6116,7 +6116,18 @@
       return;
     }
     if (updState.status === 'ready') {
-      toast('La actualización v' + updState.version + ' se instalará al cerrar la app.', 4000);
+      // Instalar ya: cierra la app, sustituye app.asar y la vuelve a abrir.
+      toast('Instalando v' + updState.version + '… la app se reiniciará sola.', 5000);
+      try {
+        const r = await g.installUpdate();
+        if (r && r.ok === false) {
+          toast('No se pudo instalar: ' + (r.error || 'error desconocido'), 5000);
+          return;
+        }
+      } catch (e) {
+        toast('No se pudo instalar la actualización', 4000);
+        return;
+      }
       return;
     }
     updState.status = 'checking';
@@ -6126,12 +6137,16 @@
     try {
       const r = await g.checkForUpdates();
       if (r && r.ok && r.version && updIsNewer(r.version)) {
-        updState.status = 'available';
-        updState.version = r.version;
-        paintUpdateBtn();
-        toast(r.light
-          ? 'Actualización ligera v' + r.version + ' (unos 4 MB). Descargando…'
-          : 'Hay una actualización disponible: v' + r.version + '. Se descargará automáticamente.', 6000);
+        // La descarga puede terminar antes de que vuelva esta llamada: no
+        // pisar el estado "downloading"/"ready" que ya fijaron los eventos.
+        if (updState.status !== 'downloading' && updState.status !== 'ready') {
+          updState.status = 'available';
+          updState.version = r.version;
+          paintUpdateBtn();
+          toast(r.light
+            ? 'Actualización ligera v' + r.version + ' (unos 4 MB). Descargando…'
+            : 'Hay una actualización disponible: v' + r.version + '. Se descargará automáticamente.', 6000);
+        }
       } else if (r && r.ok) {
         updState.status = 'none';
         paintUpdateBtn();
@@ -6173,7 +6188,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.2.5';
+  let APP_VERSION = '2.2.6';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
@@ -6334,7 +6349,7 @@
       updState.percent = 100;
       updState.status = 'ready';
       paintUpdateBtn();
-      toast('Actualización v' + version + ' lista (solo la app). Se instalará al cerrar.', 8000);
+      toast('Actualización v' + version + ' descargada. Pulsa «Instalar v' + version + '» para aplicarla y reiniciar.', 9000);
     });
   }
   if (g && g.onUpdateNotAvailable) {

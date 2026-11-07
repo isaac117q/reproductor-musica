@@ -19,8 +19,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Verificación de letra correcta (idioma, artista, similitud)
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
-- El botón Actualizar muestra el progreso de la descarga y un punto cuando hay una versión nueva
-- Actualización ligera: tras la primera instalación, las siguientes descargan solo la app (~4 MB), no el instalador completo
+- El botón Actualizar descarga solo la app (~4 MB) y, al pulsar «Instalar», la cierra, la sustituye y la reinicia sola (sin instalación del sistema)
 
 ## Instalación
 

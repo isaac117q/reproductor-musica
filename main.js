@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
 // Configurar auto-updater: notificar al usuario cuando hay actualización
@@ -640,6 +640,29 @@ function createWindow() {
   // Evita que soltar archivos desde el escritorio navegue fuera de la app
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
   mainWindow.on('closed', () => { mainWindow = null; });
+
+  // Prueba de actualización ligera (electron . --updatetest): descarga la
+  // última app.asar publicada, la programa y cierra la app para validar el
+  // mecanismo de sustitución en resources/app.asar.
+  if (process.argv.includes('--updatetest')) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          const light = await fetchLightUpdateInfo();
+          if (light && updCmp(light.version, app.getVersion()) > 0) {
+            const r = await downloadLightUpdate(light);
+            console.log('[UPDATETEST] descarga ok ' + JSON.stringify(r));
+            scheduleApplyUpdateOnQuit(false);
+          } else {
+            console.log('[UPDATETEST] no hay actualización disponible para v' + app.getVersion());
+          }
+        } catch (e) {
+          console.log('[UPDATETEST-ERR] ' + (e && (e.stack || e.message) || e));
+        }
+        app.quit();
+      }, 3000);
+    });
+  }
 }
 
 // Arrastre y soltamiento de archivos: no navegar a file://
@@ -649,6 +672,8 @@ app.on('web-contents-created', (_e, contents) => {
 });
 
 app.whenReady().then(() => {
+  // Borra restos de actualizaciones que ya no aplican (asar viejos, scripts).
+  try { cleanupUpdatesDir(); } catch (e) { /* no bloquear el arranque */ }
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -680,7 +705,32 @@ function readPendingUpdate() {
   try { return JSON.parse(fs.readFileSync(pendingUpdateFile(), 'utf8')); } catch (e) { return null; }
 }
 function clearPendingUpdate() {
+  // Borra también el .asar descargado: antes se quedaba en disco para siempre
+  // cada vez que la versión pendiente ya estaba instalada.
+  try {
+    const p = readPendingUpdate();
+    if (p && p.file) { try { fs.unlinkSync(p.file); } catch (e) { /* ya no existe */ } }
+  } catch (e) { /* pending ilegible */ }
   try { fs.unlinkSync(pendingUpdateFile()); } catch (e) { /* ya no existe */ }
+}
+
+// Limpieza al arrancar: si hay una actualización pendiente más nueva se
+// conserva (se aplicará al cerrar); si no, se borran restos de intentos
+// anteriores (asar descargado, script suelto). Así no se acumulan 4 MB por
+// cada vez que falla una actualización.
+function cleanupUpdatesDir() {
+  const p = readPendingUpdate();
+  const valida = p && p.file && fs.existsSync(p.file) &&
+    updCmp(p.version, app.getVersion()) > 0;
+  if (valida) return;
+  try { fs.unlinkSync(pendingUpdateFile()); } catch (e) { /* no existe */ }
+  try {
+    for (const f of fs.readdirSync(updatesDir())) {
+      if (/^app-.*\.asar$/i.test(f) || f === 'apply-update.ps1') {
+        try { fs.unlinkSync(path.join(updatesDir(), f)); } catch (e) { /* en uso */ }
+      }
+    }
+  } catch (e) { /* sin carpeta */ }
 }
 
 async function fetchLightUpdateInfo() {
@@ -753,7 +803,13 @@ function appAsarPath() {
 
 // Al cerrar la app: un script oculto espera a que termine el proceso y
 // sustituye resources/app.asar. No hace falta instalar nada ni descargar el exe.
-function scheduleApplyUpdateOnQuit() {
+//
+// Importante: un proceso hijo lanzado con spawn() desde Electron se muere al
+// cerrar la app (Windows lo elimina con el resto de procesos del trabajo). Por
+// eso ahora se usa el Programador de tareas de Windows, que ejecuta el script
+// fuera de la app y sí sobrevive al cierre. Si no se puede crear la tarea, se
+// intenta el método anterior como respaldo.
+function scheduleApplyUpdateOnQuit(relanzar) {
   const p = readPendingUpdate();
   if (!p || !p.file || !fs.existsSync(p.file)) return false;
   if (updCmp(p.version, app.getVersion()) <= 0) { clearPendingUpdate(); return false; }
@@ -762,25 +818,63 @@ function scheduleApplyUpdateOnQuit() {
   const dir = updatesDir();
   const script = path.join(dir, 'apply-update.ps1');
   const log = path.join(dir, 'apply-update.log');
+  const taskName = 'ReproductorMusicaUpdate_' + process.pid;
   const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  const ver = String(p.version).replace(/[^\w.-]/g, '');
   const ps = [
     "$ErrorActionPreference = 'SilentlyContinue'",
-    'Start-Sleep -Milliseconds 700',
+    // Esperar a que la app termine de verdad (el usuario puede tardar en cerrar).
+    'Start-Sleep -Milliseconds 600',
     'Wait-Process -Id ' + process.pid + ' -ErrorAction SilentlyContinue',
-    'Start-Sleep -Milliseconds 500',
-    'Copy-Item -LiteralPath ' + q(p.file) + ' -Destination ' + q(target) + ' -Force',
-    'if ($?) {',
+    'Start-Sleep -Milliseconds 400',
+    // La app puede tardar un momento en soltar app.asar: se reintenta la copia
+    // hasta 30 veces (12 s). Antes un solo intento podía fallar en silencio.
+    '$ok = $false',
+    'for ($i = 0; $i -lt 30; $i++) {',
+    '  Copy-Item -LiteralPath ' + q(p.file) + ' -Destination ' + q(target) + ' -Force',
+    '  if ($?) { $ok = $true; break }',
+    '  Start-Sleep -Milliseconds 400',
+    '}',
+    'if ($ok) {',
     '  Remove-Item -LiteralPath ' + q(p.file) + ' -Force',
     '  Remove-Item -LiteralPath ' + q(pendingUpdateFile()) + ' -Force',
-    "  Add-Content -LiteralPath " + q(log) + " -Value ('OK ' + (Get-Date -Format s) + ' v" + String(p.version).replace(/'/g, '') + "')",
+    "  Add-Content -LiteralPath " + q(log) + " -Value ('OK ' + (Get-Date -Format s) + ' v" + ver + "')",
     '} else {',
-    "  Add-Content -LiteralPath " + q(log) + " -Value ('FALLO ' + (Get-Date -Format s))",
+    "  Add-Content -LiteralPath " + q(log) + " -Value ('FALLO ' + (Get-Date -Format s) + ' v" + ver + "')",
     '}',
-    'Remove-Item -LiteralPath ' + q(script) + ' -Force'
-  ].join('\r\n');
+    'schtasks /delete /tn ' + q(taskName) + ' /f 2>$null',
+    'Remove-Item -LiteralPath ' + q(script) + ' -Force',
+    // Abrir la app de nuevo solo cuando el usuario pulsó "Instalar".
+    relanzar ? 'if ($ok) { Start-Process -FilePath ' + q(process.execPath) + ' }' : ''
+  ].filter(Boolean).join('\r\n');
   try {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(script, ps, 'utf8');
+  } catch (e) {
+    return false;
+  }
+  // 1) Programador de tareas: el proceso vive fuera de Electron y sobrevive.
+  try {
+    const tr = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + script + '"';
+    // Hora de inicio válida (2 minutos en el futuro); la tarea se ejecuta ya con
+    // /run, pero schtasks rechaza una hora pasada.
+    const t = new Date(Date.now() + 120000);
+    const hhmm = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+    const c = spawnSync('schtasks.exe',
+      ['/create', '/tn', taskName, '/tr', tr, '/sc', 'once', '/st', hhmm, '/f', '/it'],
+      { windowsHide: true, stdio: 'ignore' });
+    if (c && c.status === 0) {
+      spawnSync('schtasks.exe', ['/run', '/tn', taskName], { windowsHide: true, stdio: 'ignore' });
+      appendDebug('actualización ligera programada: tarea ' + taskName + (relanzar ? ' (con reinicio)' : ''));
+      return true;
+    }
+    const err = c && (c.error ? c.error.message : 'código ' + c.status);
+    appendDebug('no se pudo crear la tarea de actualización: ' + err);
+  } catch (e) {
+    appendDebug('error creando la tarea de actualización: ' + (e && e.message || e));
+  }
+  // 2) Respaldo: PowerShell suelto (puede no sobrevivir al cierre de Electron).
+  try {
     const child = spawn('powershell.exe',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script],
       { detached: true, stdio: 'ignore', windowsHide: true });
@@ -795,7 +889,10 @@ let applyingLightUpdate = false;
 app.on('before-quit', () => {
   if (applyingLightUpdate) return;
   applyingLightUpdate = true;
-  scheduleApplyUpdateOnQuit();
+  // Si el usuario ya pulsó "Instalar", el script va con reinicio y no debe
+  // reescribirse aquí sin él.
+  if (!readPendingUpdate()) return;
+  scheduleApplyUpdateOnQuit(false);
 });
 
 // IPC para actualizaciones
@@ -805,6 +902,19 @@ ipcMain.handle('check-for-updates', async () => {
   let light = null;
   try { light = await fetchLightUpdateInfo(); } catch (e) { light = null; }
   if (light && updCmp(light.version, app.getVersion()) > 0) {
+    // Si ya se descargó esa misma versión, no se vuelve a bajar (antes cada
+    // pulsación de "Actualizar" descargaba otros 3,55 MB aunque ya estuviera).
+    const pend = readPendingUpdate();
+    if (pend && pend.file && fs.existsSync(pend.file) &&
+        updCmp(pend.version, app.getVersion()) > 0 &&
+        updCmp(pend.version, light.version) >= 0) {
+      const win = mainWindow || BrowserWindow.getAllWindows()[0];
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('update-progress', { percent: 100 });
+        win.webContents.send('update-downloaded', pend.version);
+      }
+      return { ok: true, available: true, version: pend.version, light: true, ready: true };
+    }
     downloadLightUpdate(light).catch(err => {
       const win = mainWindow || BrowserWindow.getAllWindows()[0];
       if (win && !win.isDestroyed()) {
@@ -825,9 +935,17 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
-ipcMain.handle('install-update', () => {
-  if (readPendingUpdate()) { app.quit(); return true; }
+ipcMain.handle('install-update', async () => {
+  if (readPendingUpdate()) {
+    // El script se programa ANTES de salir (app.exit no dispara before-quit) y
+    // se marca con reinicio: al terminar de copiar, vuelve a abrir la app.
+    const ok = scheduleApplyUpdateOnQuit(true);
+    if (!ok) return { ok: false, error: 'no se pudo programar la instalación' };
+    setTimeout(() => { try { app.exit(0); } catch (e) { } }, 500);
+    return { ok: true, restarting: true };
+  }
   autoUpdater.quitAndInstall();
+  return { ok: true, restarting: true };
 });
 
 // Versión real de la app (la insignia de la barra superior ya no se queda fija
