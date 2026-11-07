@@ -167,15 +167,21 @@
   }
 
   /* ---------- Escenario ---------- */
-  .stage { display: flex; flex-direction: column; padding: 26px; gap: 15px; align-items: center; position: relative; overflow: hidden; }
+  .stage {
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: clamp(14px, 2.4vh, 32px) clamp(16px, 2.5vw, 36px);
+    gap: clamp(10px, 1.85vh, 20px);
+    position: relative; overflow-y: auto; overflow-x: hidden;
+  }
   .art {
-    position: relative; z-index: 1;
-    width: min(330px, 74%); aspect-ratio: 1;
+    position: relative; z-index: 1; flex: 0 1 auto;
+    width: min(390px, 78%, 36vh); aspect-ratio: 1;
     border-radius: 24px; overflow: hidden;
     background: linear-gradient(160deg, var(--accent-soft), var(--viz2) 62%, var(--accent));
     display: grid; place-items: center;
     box-shadow: 0 34px 70px color-mix(in srgb, var(--accent) 32%, transparent);
-    transition: transform .4s cubic-bezier(.2,.9,.3,1.2);
+    transition: transform .4s cubic-bezier(.2,.9,.3,1.2), width .2s ease;
   }
   .playing .art { transform: scale(1.015); }
   .vinyl {
@@ -218,8 +224,8 @@
 
   .now { z-index: 1; text-align: center; width: 100%; display: flex; align-items: flex-start; gap: 12px; justify-content: center; }
   .now .txt { min-width: 0; }
-  .now h1 { font-size: clamp(21px, 2.4vw, 28px); font-weight: 800; letter-spacing: -.5px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .now p { color: var(--muted); font-size: 15px; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now h1 { font-size: clamp(21px, min(2.5vw, 3.2vh), 31px); font-weight: 800; letter-spacing: -.5px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now p { color: var(--muted); font-size: clamp(14px, min(1.45vw, 1.85vh), 16.5px); margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .now .heart {
     flex: none; font-size: 22px; color: var(--muted); padding: 4px;
     transition: .15s; line-height: 1;
@@ -228,9 +234,9 @@
   .now .heart.on { color: var(--danger); }
 
   /* ---------- Seek ---------- */
-  .seek { z-index: 1; width: 100%; max-width: 460px; }
+  .seek { z-index: 1; width: 100%; max-width: min(540px, 90%); }
   .bar { position: relative; height: 22px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
-  .bar .rail { position: absolute; left: 0; right: 0; height: 5px; border-radius: 99px; background: var(--rail); overflow: visible; }
+  .bar .rail { position: absolute; left: 0; right: 0; height: 6px; border-radius: 99px; background: var(--rail); overflow: visible; }
   .bar .buffered { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--buffered); border-radius: 99px; }
   .bar .played { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--text); border-radius: 99px; }
   .bar .knob {
@@ -247,33 +253,35 @@
     opacity: 0; pointer-events: none; transition: .15s; white-space: nowrap;
   }
   .bar:hover .tip { opacity: 1; }
-  .times { display: flex; justify-content: space-between; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; margin-top: 5px; }
+  .times { display: flex; justify-content: space-between; color: var(--muted); font-size: clamp(12px, 1.4vh, 13.5px); font-variant-numeric: tabular-nums; margin-top: 5px; }
 
   /* ---------- Transporte ---------- */
-  .transport { z-index: 1; display: flex; align-items: center; gap: 10px; }
+  .transport { z-index: 1; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: clamp(8px, 1.1vw, 14px); }
   .ctl {
-    width: 44px; height: 44px; border-radius: 13px;
+    width: clamp(42px, min(4.3vw, 5.5vh), 52px); height: clamp(42px, min(4.3vw, 5.5vh), 52px); border-radius: 14px;
     display: grid; place-items: center; color: var(--muted);
     background: var(--chip); border: 1px solid transparent;
     transition: .16s;
   }
+  .ctl .ic { width: clamp(19px, min(1.9vw, 2.4vh), 23px); height: clamp(19px, min(1.9vw, 2.4vh), 23px); }
   .ctl:hover { color: var(--text); background: var(--ctl-hover); transform: translateY(-2px); }
   .ctl:active { transform: translateY(0) scale(.95); }
-  .ctl.small { width: 38px; height: 38px; border-radius: 11px; }
-  .ctl.small .ic { width: 17px; height: 17px; }
+  .ctl.small { width: clamp(36px, min(3.7vw, 4.7vh), 44px); height: clamp(36px, min(3.7vw, 4.7vh), 44px); border-radius: 12px; }
+  .ctl.small .ic { width: clamp(16px, min(1.6vw, 2vh), 20px); height: clamp(16px, min(1.6vw, 2vh), 20px); }
   .ctl.on { color: var(--accent); background: var(--accent-soft); }
   .ctl.big {
-    width: 66px; height: 66px; border-radius: 50%; color: var(--panel); font-size: 24px;
+    width: clamp(60px, min(6.2vw, 7.8vh), 76px); height: clamp(60px, min(6.2vw, 7.8vh), 76px); border-radius: 50%; color: var(--panel); font-size: 26px;
     background: var(--text);
     box-shadow: 0 16px 34px rgba(18,19,26,.32);
     border: none;
   }
+  #icPlay { width: clamp(24px, min(2.4vw, 3vh), 30px) !important; height: clamp(24px, min(2.4vw, 3vh), 30px) !important; }
   .ctl.big:hover { color: var(--panel); background: var(--text); opacity: .85; transform: translateY(-2px) scale(1.03); }
-  .ctl .badge { font-size: 11.5px; font-weight: 750; }
-  .extras { z-index: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .volbox { display: flex; align-items: center; background: var(--chip); border-radius: 11px; overflow: hidden; transition: .2s; }
+  .ctl .badge { font-size: clamp(11.5px, 1.35vh, 13px); font-weight: 750; }
+  .extras { z-index: 1; display: flex; align-items: center; gap: clamp(8px, 1vw, 12px); flex-wrap: wrap; justify-content: center; }
+  .volbox { display: flex; align-items: center; background: var(--chip); border-radius: 12px; overflow: hidden; transition: .2s; }
   .volbox:hover, .volbox:focus-within { box-shadow: 0 4px 14px rgba(20,24,60,.08); }
-  .volbox .ctl { border: none; background: none; width: 38px; height: 36px; }
+  .volbox .ctl { border: none; background: none; width: clamp(36px, min(3.7vw, 4.7vh), 44px); height: clamp(36px, min(3.7vw, 4.7vh), 42px); }
   .volbox input[type=range] { width: 0; opacity: 0; transition: .25s; }
   .volbox:hover input[type=range], .volbox:focus-within input[type=range] { width: 86px; opacity: 1; margin-right: 8px; }
 
@@ -284,17 +292,17 @@
   }
 
   /* ---------- Chips (mockup 4) ---------- */
-  .chips { z-index: 1; display: flex; gap: 9px; flex-wrap: wrap; justify-content: center; }
+  .chips { z-index: 1; display: flex; gap: clamp(8px, 1vw, 12px); flex-wrap: wrap; justify-content: center; }
   .chip {
-    background: var(--chip2); padding: 8px 17px; border-radius: 99px;
-    font-size: 13px; font-weight: 650; color: color-mix(in srgb, var(--text) 68%, var(--muted)); transition: .16s;
+    background: var(--chip2); padding: clamp(7px, 1vh, 10px) clamp(15px, 1.6vw, 21px); border-radius: 99px;
+    font-size: clamp(12.5px, 1.5vh, 14.5px); font-weight: 650; color: color-mix(in srgb, var(--text) 68%, var(--muted)); transition: .16s;
     border: 1px solid transparent;
   }
   .chip:hover { background: var(--ctl-hover); color: var(--text); }
   .chip.on { background: var(--text); color: var(--panel); }
 
   /* ---------- Visualizador ---------- */
-  .vizwrap { z-index: 1; width: 100%; max-width: 460px; height: 44px; }
+  .vizwrap { z-index: 1; width: 100%; max-width: min(540px, 90%); height: clamp(32px, 4.8vh, 52px); }
   #viz { width: 100%; height: 100%; display: block; }
 
   /* ---------- Panel derecho ---------- */
@@ -755,7 +763,7 @@
     border-color: #3a2f22;
   }
   body[data-st="cassette"] .art {
-    width: min(330px, 84%); aspect-ratio: 170 / 106; border-radius: 14px;
+    width: min(390px, 84%, 46vh); aspect-ratio: 170 / 106; border-radius: 14px;
     border: 3px solid #3a2f22;
     background:
       linear-gradient(90deg, #7a5a30, #3a2f22) 50% 73% / 46% 8px no-repeat,
@@ -1102,7 +1110,7 @@
     border-color: rgba(57,255,136,.2);
   }
   body[data-st="crt"] .art {
-    width: min(310px, 78%); aspect-ratio: 4 / 3; border-radius: 10px;
+    width: min(360px, 78%, 40vh); aspect-ratio: 4 / 3; border-radius: 10px;
     border: 3px solid #1f6b45;
     background: radial-gradient(circle at 50% 45%, #0c2a1a, #04120b 72%);
     box-shadow: 0 0 0 4px #0a1a12, 0 0 34px rgba(57,255,136,.32), inset 0 0 42px rgba(57,255,136,.22);
@@ -1344,7 +1352,7 @@
     border-color: #2c251b;
   }
   body[data-st="cine"] .art {
-    width: min(310px, 78%); aspect-ratio: 4 / 3; border-radius: 3px;
+    width: min(360px, 78%, 40vh); aspect-ratio: 4 / 3; border-radius: 3px;
     border: 6px solid #efe3c8;
     background: linear-gradient(180deg, #3a3126, #1a150f);
     box-shadow: 0 16px 34px rgba(0,0,0,.6), inset 0 0 40px rgba(0,0,0,.7);
@@ -1416,7 +1424,7 @@
     border-color: #e7e2d2;
   }
   body[data-st="paper"] .art {
-    width: min(212px, 53%); aspect-ratio: 142 / 158; border-radius: 2px; overflow: visible;
+    width: min(250px, 56%, 33vh); aspect-ratio: 142 / 158; border-radius: 2px; overflow: visible;
     background: #fff; border: 1px solid #e7e2d2;
     box-shadow: 0 12px 24px rgba(90,80,50,.2);
     transform: rotate(-2.4deg);
@@ -1487,7 +1495,7 @@
     border-color: rgba(255,46,166,.2);
   }
   body[data-st="neon"] .art {
-    width: min(320px, 80%); aspect-ratio: 16 / 10; border-radius: 12px;
+    width: min(380px, 80%, 44vh); aspect-ratio: 16 / 10; border-radius: 12px;
     border: 2px solid #ff2ea6;
     background:
       radial-gradient(circle at 28% 30%, rgba(255,46,166,.18), transparent 55%),
@@ -2242,7 +2250,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v1.7.1</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.2.7</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -6188,7 +6196,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.2.6';
+  let APP_VERSION = '2.2.7';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
