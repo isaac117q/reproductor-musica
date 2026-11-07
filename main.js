@@ -500,6 +500,31 @@ ipcMain.handle('search-lyrics', async (_event, payload) => {
 });
 
 
+// Búsqueda estructurada: track_name + artist_name. A diferencia de la búsqueda
+// libre (q), LRCLIB devuelve de forma consistente todas las versiones de ese
+// artista, incluidas las sincronizadas buenas.
+ipcMain.handle('search-lyrics-structured', async (_event, payload) => {
+  const p = (payload && typeof payload === 'object') ? payload : {};
+  const enc = (s) => encodeURIComponent(String(s || '').slice(0, 200));
+  const track = String(p.trackName || '').trim();
+  const artist = String(p.artistName || '').trim();
+  if (!track) return { ok: false, error: 'sin título' };
+  let url = 'https://lrclib.net/api/search?track_name=' + enc(track);
+  if (artist) url += '&artist_name=' + enc(artist);
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const data = await lyricsFetch(url);
+      return { ok: true, data };
+    } catch (err) {
+      lastErr = String(err && err.message || err);
+      if (isNetError(lastErr)) return { ok: false, error: lastErr, net: true };
+      if (attempt < 2) await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+    }
+  }
+  return { ok: false, error: lastErr };
+});
+
 // Colores de la barra de título (Windows) según el tema activo
 ipcMain.on('titlebar-colors', (event, colors) => {
   const win = BrowserWindow.fromWebContents(event.sender);

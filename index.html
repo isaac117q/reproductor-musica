@@ -2086,9 +2086,23 @@
   }
 
   body[data-ly="gradiente"] .ly.on {
-    background: linear-gradient(92deg, var(--accent), var(--viz2));
+    color: var(--text); background: none; font-weight: 830; letter-spacing: -.6px;
+  }
+  /* El gradiente se aplica a cada palabra (no a la línea entera): así las
+     palabras completadas no quedan invisibles por heredar color transparente. */
+  body[data-ly="gradiente"] .ly.on .w {
+    background-image: linear-gradient(92deg, var(--accent), var(--viz2));
     -webkit-background-clip: text; background-clip: text;
-    color: transparent; font-weight: 830; letter-spacing: -.6px;
+    color: transparent; -webkit-text-fill-color: transparent;
+  }
+  body[data-ly="gradiente"] .ly.on .w.done { opacity: 1; }
+  body[data-ly="gradiente"] .ly.on .w.cur {
+    opacity: 1;
+    background-image: linear-gradient(90deg,
+      var(--text) var(--wp, 100%),
+      color-mix(in srgb, var(--accent) 55%, transparent) var(--wp, 100%));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   body[data-ly="cinta"] .ly.on {
@@ -2128,6 +2142,11 @@
   body[data-ly="palabra"] .ly.on .w.cur {
     color: var(--bg); background: var(--accent); border-radius: 5px;
     box-shadow: 0 0 0 2px var(--accent);
+    /* El resaltado karaoke base deja la palabra con relleno transparente y
+       recorte de fondo; este estilo pinta la palabra entera de un color. */
+    background-image: none;
+    -webkit-background-clip: border-box; background-clip: border-box;
+    -webkit-text-fill-color: var(--bg);
   }
 
   /* ---------- Selector de tema y estilo (pestaña "Tema") ---------- */
@@ -3516,19 +3535,22 @@
     // Las letras refinadas por algoritmos antiguos pueden traer un desplazamiento
     // falso grabado (incluidos los "ajustes finos" línea a línea que estropeaban
     // letras correctas): se descartan y se revalidan contra la voz.
-    const refinVieja = (d) => !!(d && (d.voiceRefined || d.voiceSnap || d.voiceWords) && d.vr !== 3);
+    const refinVieja = (d) => !!(d && (d.voiceRefined || d.voiceSnap || d.voiceWords) && !(d.vr >= 4));
+    // Un ajuste automático antiguo (letra simple pegada a la voz) tampoco se
+    // reutiliza: la nueva búsqueda prefiere una letra sincronizada real.
+    const autoVieja = (d) => !!(d && d.voiceAligned && !(d.vr >= 4));
     try {
       const g = api();
       if (g && g.loadCachedLyrics) {
         const data = await g.loadCachedLyrics(key);
-        if (data && refinVieja(data)) return null;
+        if (data && (refinVieja(data) || autoVieja(data))) return null;
         if (data && fileSig && (!data.fileSig || data.fileSig !== fileSig)) return null; // otro archivo o caché vieja
         return data;
       }
       const raw = localStorage.getItem('rp-ly-' + key);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (data && refinVieja(data)) return null;
+      if (data && (refinVieja(data) || autoVieja(data))) return null;
       if (fileSig && data && (!data.fileSig || data.fileSig !== fileSig)) return null; // otro archivo o caché vieja
       return data;
     } catch (e) { return null; }
@@ -3749,12 +3771,30 @@
   }
   // ¿La letra corresponde a ESTA versión de la canción?
   // Se exige que la última línea caiga dentro de una ventana razonable:
-  // ni un fragmento corto ni una versión mucho más larga.
+  // ni un fragmento corto ni una versión mucho más larga. Además la letra debe
+  // cubrir buena parte de la canción: una entrada con las 75 líneas amontonadas
+  // entre los segundos 66 y 102 de un tema de 354 s está corrupta aunque su
+  // última marca pase el filtro anterior.
   function fitsDuration(lines, dur) {
     if (!dur || !Array.isArray(lines) || !lines.length) return true;
-    const last = Number(lines[lines.length - 1].t);
-    if (!isFinite(last)) return false;
-    return lines.length >= 3 && last <= dur + 5 && last >= Math.max(dur * 0.4, 10);
+    const times = lines.map(l => Number(l && l.t)).filter(t => isFinite(t) && t >= 0)
+      .sort((a, b) => a - b);
+    if (times.length < 3) return false;
+    const first = times[0], last = times[times.length - 1];
+    if (last > dur + 5) return false;
+    if (last < Math.max(dur * 0.4, 10)) return false;
+    if (dur >= 90) {
+      const span = last - first;
+      if (span < dur * 0.5) return false;
+      // Intervalo mediano entre líneas: si están agolpadas (menos de ~0,3 s
+      // entre línea y línea durante toda la letra), los tiempos no son reales.
+      const gaps = [];
+      for (let i = 1; i < times.length; i++) gaps.push(times[i] - times[i - 1]);
+      gaps.sort((a, b) => a - b);
+      const median = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
+      if (median < 0.3) return false;
+    }
+    return true;
   }
   // Reintenta en segundo plano pasar de "letra simple" a "letra con tiempos".
   // Con espera creciente: 1 min, 5 min y luego cada 15 min (no machacar el servidor).
@@ -3998,6 +4038,23 @@
     if (!t._hydratePromise) hydrateOffline(t);
     if (t._hydratePromise) { try { await t._hydratePromise; } catch (e) { } }
     if (t.offlineLyrics && t.offlineLyrics.type === 'synced') {
+      // Un LRC auto-alineado por una versión anterior (o estimado por largo de
+      // línea) NO debe impedir que se descargue una letra sincronizada real.
+      // Se guarda como respaldo y se intenta mejorar online.
+      const autoLocal = !!(t.offlineLyrics.voiceAligned || t.offlineLyrics.estimated);
+      if (autoLocal && !netBlocked()) {
+        t._autoLocal = t.offlineLyrics;
+        t._lrcMala = t.offlineLyrics;
+        t.offlineLyrics = null;
+        // hydrateOffline ya había puesto el .lrc automático en t.lyrics (es el
+        // mismo objeto): hay que quitarlo también para que se busque la buena.
+        t.lyrics = null;
+        t.lyricState = null;
+        t.lyricError = null;
+        dbg('lrc automático guardado: se busca una letra sincronizada real');
+      }
+    }
+    if (t.offlineLyrics && t.offlineLyrics.type === 'synced') {
       // La letra que vive junto al audio tiene prioridad, pero antes de confiar
       // en ella se comprueba contra una fuente externa. Así se detectan los
       // .lrc antiguos que contenían la letra de OTRA canción (p. ej. Skillet
@@ -4175,6 +4232,83 @@
     let plainFallback = null, lastErr = null, gotAny = false;
     const wantExact = !!(cArtist && cTitle && dur > 30);
 
+    // Evalúa una lista de resultados de LRCLIB y devuelve las letras con tiempos
+    // que de verdad corresponden a esta pista. Se usa tanto para la búsqueda
+    // libre como para la búsqueda estructurada (track_name + artist_name).
+    const evaluarDatos = (data, etiqueta) => {
+      if (!Array.isArray(data) || !data.length) return [];
+      // Idioma original SIEMPRE: la app no traduce nada.
+      // Se prefiere la entrada original; una "Traducción ..." solo se usa si no hay original.
+      const esTraducida = x => /traduc|translation/i.test(String(x.trackName || ''));
+      // De TODOS los resultados, quedarse con la mejor letra que traiga tiempos:
+      // primero idioma original, después duración más parecida a la pista.
+      const cands = [];
+      const rej = { sinSync: 0, sinLineas: 0, fit: 0, idioma: 0, titulo: 0, artista: 0 };
+      for (const x of data) {
+        if (!x || !x.syncedLyrics || x.instrumental === true) { rej.sinSync++; continue; }
+        const lines = parseSynced(x.syncedLyrics);
+        if (!lines.length) { rej.sinLineas++; continue; }
+        if (!fitsDuration(lines, dur)) { rej.fit++; continue; }
+        // ¿La letra está en el idioma de la canción? ¿El título ofrecido se parece
+        // al de la pista? Con eso se descarta la versión en inglés u otra versión.
+        const langLetra = detectLang(String(x.syncedLyrics).slice(0, 1500));
+        // Si la letra está en OTRO idioma que el título/artista, no es la
+        // letra original: se descarta (El Perdón no debe mostrar "Forgiveness").
+        if (langPista && langLetra && langLetra !== langPista) { rej.idioma++; continue; }
+        const langOk = (langPista && langLetra) ? (langLetra === langPista ? 1 : 0) : 0.5;
+        const sim = Math.max(
+          simTitulo(x.trackName, cTitle),
+          tLimpio ? simTitulo(x.trackName, tLimpio) : 0,
+          simTitulo(x.trackName, rawTitle)
+        );
+        // El título ofrecido debe ser el de ESTA canción y del MISMO artista.
+        // Antes bastaba con que la duración se pareciera y se colaba otro
+        // tema del mismo artista (Skillet "Lift Me Up" → "Scream") o de otro
+        // artista con el mismo título ("Se Acabó" de SanLuis → la de Osquel).
+        if (sim < 0.45) { rej.titulo++; continue; }
+        if (!simArtista(x.artistName, cArtist)) { rej.artista++; continue; }
+        const times = lines.map(l => +l.t).filter(t => isFinite(t)).sort((a, b) => a - b);
+        const span = times.length ? times[times.length - 1] - times[0] : 0;
+        cands.push({
+          x, lines, langOk, sim,
+          trad: esTraducida(x) ? 1 : 0,
+          durOff: (x.duration && dur) ? Math.abs(x.duration - dur) : 999,
+          // Cobertura: cuánto de la canción abarca la letra. A igual duración,
+          // mejor una letra completa que una recortada a un tramo.
+          cover: dur > 0 ? span / dur : 0
+        });
+      }
+      // Primero el TÍTULO correcto; después idioma original, duración de ESTA
+      // versión, cobertura de la canción y calidad. Antes la duración mandaba
+      // y podía imponer otra canción del mismo artista.
+      cands.sort((a, b) => (b.sim - a.sim) || (b.langOk - a.langOk) || (a.trad - b.trad) ||
+        (a.durOff - b.durOff) || (b.cover - a.cover) || (b.lines.length - a.lines.length));
+      dbg(etiqueta + ': ' + data.length + ' resultado(s) → ' + cands.length + ' con tiempos válidos' +
+          ' (sinSync=' + rej.sinSync + ' fit=' + rej.fit + ' idioma=' + rej.idioma +
+          ' titulo=' + rej.titulo + ' artista=' + rej.artista + ', dur=' + Math.round(dur) + ')');
+      if (cands.length) return cands;
+      // Letra simple de reserva: solo si el TÍTULO coincide de verdad y está en
+      // el idioma original. Antes se cogía cualquier resultado de duración
+      // parecida y terminaba mostrando la letra de otra canción.
+      if (!plainFallback) {
+        const simples = data.filter(x => {
+          if (!x || !x.plainLyrics || esTraducida(x)) return false;
+          const langLetra = detectLang(String(x.plainLyrics).slice(0, 1500));
+          if (langPista && langLetra && langLetra !== langPista) return false;
+          const sim = Math.max(
+            simTitulo(x.trackName, cTitle),
+            tLimpio ? simTitulo(x.trackName, tLimpio) : 0,
+            simTitulo(x.trackName, rawTitle)
+          );
+          return sim >= 0.45 && !!simArtista(x.artistName, cArtist);
+        });
+        simples.sort((a, b) =>
+          Math.abs((a.duration || 0) - dur) - Math.abs((b.duration || 0) - dur));
+        plainFallback = simples[0] || null;
+      }
+      return cands;
+    };
+
     for (let qi = 0; qi < queries.length; qi++) {
       if (netBlocked()) break;
       const q = queries[qi];
@@ -4221,47 +4355,7 @@
         }
         if (!Array.isArray(data) || !data.length) continue;
         gotAny = true;
-        dbg('consulta "' + String(q).slice(0, 45) + '": ' + data.length + ' resultado(s)');
-        // Idioma original SIEMPRE: la app no traduce nada.
-        // Se prefiere la entrada original; una "Traducción ..." solo se usa si no hay original.
-        const esTraducida = x => /traduc|translation/i.test(String(x.trackName || ''));
-        // De TODOS los resultados, quedarse con la mejor letra que traiga tiempos:
-        // primero idioma original, después duración más parecida a la pista.
-        const cands = [];
-        for (const x of data) {
-          if (!x || !x.syncedLyrics || x.instrumental === true) continue;
-          const lines = parseSynced(x.syncedLyrics);
-          if (!lines.length || !fitsDuration(lines, dur)) continue;   // ¿es de esta versión?
-          // ¿La letra está en el idioma de la canción? ¿El título ofrecido se parece
-          // al de la pista? Con eso se descarta la versión en inglés u otra versión.
-          const langLetra = detectLang(String(x.syncedLyrics).slice(0, 1500));
-          // Si la letra está en OTRO idioma que el título/artista, no es la
-          // letra original: se descarta (El Perdón no debe mostrar "Forgiveness").
-          if (langPista && langLetra && langLetra !== langPista) continue;
-          const langOk = (langPista && langLetra) ? (langLetra === langPista ? 1 : 0) : 0.5;
-          const sim = Math.max(
-            simTitulo(x.trackName, cTitle),
-            tLimpio ? simTitulo(x.trackName, tLimpio) : 0,
-            simTitulo(x.trackName, rawTitle)
-          );
-          // El título ofrecido debe ser el de ESTA canción y del MISMO artista.
-          // Antes bastaba con que la duración se pareciera y se colaba otro
-          // tema del mismo artista (Skillet "Lift Me Up" → "Scream") o de otro
-          // artista con el mismo título ("Se Acabó" de SanLuis → la de Osquel).
-          if (sim < 0.45) continue;
-          if (!simArtista(x.artistName, cArtist)) continue;
-          cands.push({
-            x, lines, langOk, sim,
-            trad: esTraducida(x) ? 1 : 0,
-            durOff: (x.duration && dur) ? Math.abs(x.duration - dur) : 999
-          });
-        }
-        // Primero el TÍTULO correcto; después idioma original, duración de ESTA
-        // versión y calidad de la sincronización. Antes la duración mandaba y
-        // podía imponer otra canción del mismo artista.
-        cands.sort((a, b) => (b.sim - a.sim) || (b.langOk - a.langOk) || (a.trad - b.trad) ||
-          (a.durOff - b.durOff) || (b.lines.length - a.lines.length));
-        dbg('con tiempos válidos: ' + cands.length + ' de ' + data.length + ' (dur=' + Math.round(dur) + ')');
+        const cands = evaluarDatos(data, 'consulta "' + String(q).slice(0, 45) + '"');
         if (cands.length) {
           const best = cands[0];
           // fileSig: marca el archivo al que pertenece esta letra → el análisis de voz
@@ -4272,25 +4366,6 @@
               best.lines.length + ' desfase=' + (best.durOff === 999 ? '?' : Math.round(best.durOff) + 's'));
           break;
         }
-        // Letra simple de reserva: solo si el TÍTULO coincide de verdad y está en
-        // el idioma original. Antes se cogía cualquier resultado de duración
-        // parecida y terminaba mostrando la letra de otra canción.
-        if (!plainFallback) {
-          const simples = data.filter(x => {
-            if (!x || !x.plainLyrics || esTraducida(x)) return false;
-            const langLetra = detectLang(String(x.plainLyrics).slice(0, 1500));
-            if (langPista && langLetra && langLetra !== langPista) return false;
-            const sim = Math.max(
-              simTitulo(x.trackName, cTitle),
-              tLimpio ? simTitulo(x.trackName, tLimpio) : 0,
-              simTitulo(x.trackName, rawTitle)
-            );
-            return sim >= 0.45 && !!simArtista(x.artistName, cArtist);
-          });
-          simples.sort((a, b) =>
-            Math.abs((a.duration || 0) - dur) - Math.abs((b.duration || 0) - dur));
-          plainFallback = simples[0] || null;
-        }
       } catch (e) {
         lastErr = e && e.message || String(e);
         dbg('consulta "' + String(q).slice(0, 45) + '" error: ' + lastErr);
@@ -4299,6 +4374,66 @@
           break;
         }
       }
+    }
+
+    // La búsqueda libre de LRCLIB devuelve resultados distintos según el
+    // servidor que responda: para "La Boda" a veces devolvía una sola entrada
+    // (la corrupta) y se perdía la versión buena. track_name + artist_name es
+    // determinista y trae todas las versiones de ese artista.
+    if (!t.lyrics && wantExact && !netBlocked()) {
+      try {
+        const g = api();
+        let data = null;
+        if (g && g.searchLyricsStructured) {
+          const res = await Promise.race([
+            g.searchLyricsStructured({ trackName: cTitle, artistName: cArtist }),
+            new Promise(r => setTimeout(() => r({ ok: false, error: 'tiempo de espera agotado' }), 15000))
+          ]);
+          if (res && res.ok) data = res.data;
+          else if (res && res.net) state.offlineUntil = Date.now() + 60000;
+        }
+        // Respaldo en navegador (o si el puente no expone la búsqueda estructurada).
+        if (!data) {
+          const ctrl = new AbortController();
+          const to = setTimeout(() => ctrl.abort(), 8000);
+          try {
+            const r = await fetch('https://lrclib.net/api/search?track_name=' +
+              encodeURIComponent(cTitle) + '&artist_name=' + encodeURIComponent(cArtist),
+              { signal: ctrl.signal });
+            if (r.ok) data = await r.json();
+          } finally { clearTimeout(to); }
+        }
+        if (Array.isArray(data) && data.length) {
+          gotAny = true;
+          const cands = evaluarDatos(data, 'estructurada "' + cTitle + ' / ' + cArtist + '"');
+          if (cands.length) {
+            const best = cands[0];
+            t.lyrics = { type: 'synced', lines: best.lines, track: best.x.trackName,
+              artist: best.x.artistName, fileSig };
+            if (best.trad) t.lyrics.source = 'letra traducida de la fuente';
+            dbg('letra con tiempos (estructurada): "' + String(best.x.trackName || '').slice(0, 40) +
+                '" lineas=' + best.lines.length);
+          }
+        }
+      } catch (e) {
+        dbg('búsqueda estructurada error: ' + (e && e.message || e));
+      }
+    }
+
+    // Si no se encontró una letra sincronizada real, se conserva el ajuste
+    // automático que ya estaba guardado (mejor eso que perder los tiempos).
+    if (!t.lyrics && t._autoLocal) {
+      t.lyrics = t._autoLocal;
+      t.lyricState = 'done';
+      dbg('sin letra sincronizada nueva: se conserva el ajuste automático guardado');
+    }
+    // Si sí llegó una letra sincronizada real, reemplaza el .lrc automático que
+    // había junto al audio para que el siguiente arranque use la buena.
+    if (t._lrcMala && t.lyrics && t.lyrics.type === 'synced' && !t.lyrics.offline &&
+        !t.lyrics.voiceAligned && !t.lyrics.estimated) {
+      guardarLrcLineas(t, t.lyrics.lines);
+      t._lrcMala = null;
+      dbg('lrc local reemplazado por la letra sincronizada real');
     }
 
     if (!t.lyrics && plainFallback && plainFallback.plainLyrics) {
@@ -4428,7 +4563,7 @@
       if (L.voiceAligned) L.alignedDur = Math.round(durSec(t) || 0) || undefined;
     }
     saveCachedLyrics(lyricKey(t), {
-      v: 3, vr: 3, type: 'synced', lines: L.lines, dur: durSec(t), source: L.source,
+      v: 3, vr: 4, type: 'synced', lines: L.lines, dur: durSec(t), source: L.source,
       estimated: !!L.estimated,
       voiceAligned: !!L.voiceAligned, voiceRefined: true, voiceShift: L.voiceShift,
       voiceWords: !!L.voiceWords,
@@ -4719,8 +4854,16 @@
     const N = rows.length;
     if (N < 2) return;
     let phrases = (A.phrases || [])
-      .filter(p => p && p.end - p.t >= 0.25)
-      .map(p => ({ t: p.t, end: p.end }))
+      .filter(p => {
+        if (!p || !(p.end > p.t)) return false;
+        const len = p.end - p.t;
+        const eff = (p.eff === undefined) ? len : p.eff;
+        // Frases basura (respiraciones, ruido, golpes de 0,2-0,8 s): no deben
+        // llevarse una línea de la letra. Solo cuentan frases cantadas de verdad;
+        // antes la primera línea acababa en un ruido de 0,3 s al inicio del tema.
+        return (len >= 0.9 && eff >= 0.6) || (len >= 1.8 && eff >= 0.45);
+      })
+      .map(p => ({ t: p.t, end: p.end, eff: p.eff }))
       .sort((a, b) => a.t - b.t);
     if (!phrases.length) return;
     const dur = durSec(t) || A.duration || 0;
@@ -4739,9 +4882,10 @@
     if (total < 5 || phrases.length < 2 || coverage > 0.92) return;
 
     // Reparto: cada frase recibe el número de líneas proporcional a su duración
-    // cantada (método del mayor resto para repartir los sobrantes).
+    // cantada (método del mayor resto para repartir los sobrantes). Se permite 0:
+    // una frase corta no debe forzar una línea solo para cumplir un mínimo.
     const raw = phrases.map(p => N * (p.eff || (p.end - p.t)) / total);
-    const counts = raw.map(x => Math.max(1, Math.floor(x)));
+    const counts = raw.map(x => Math.max(0, Math.floor(x + 0.001)));
     const sumC = counts.reduce((a, b) => a + b, 0);
     if (sumC < N) {
       const order = raw.map((x, i) => ({ i, r: x - Math.floor(x) })).sort((a, b) => b.r - a.r);
@@ -5237,6 +5381,9 @@
         // ninguna línea. Se guarda con la letra para no reanalizar el audio.
         const info = voiceSyncInfo(cur, A, durSec(t));
         if (info) {
+          // Si la letra se ajustó desde texto simple, el mismo análisis que la
+          // colocó no puede darla por verificada: se guarda como advertencia.
+          if (cur.voiceAligned || cur.estimated) info.verdict = 'warn';
           cur.syncInfo = info;
           cur.syncNA = false;
         } else if (cur.type === 'synced') {
@@ -5261,7 +5408,7 @@
           // inicio; el análisis de voz se reintenta en la próxima sesión.
           if (cur.type === 'synced' && Array.isArray(cur.lines) && cur.lines.length >= 3) {
             saveCachedLyrics(lyricKey(t), {
-              v: 3, vr: 3, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
+              v: 3, vr: 4, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
               estimated: !!cur.estimated,
               voiceAligned: !!cur.voiceAligned, voiceRefined: !!cur.voiceRefined,
               voiceShift: cur.voiceShift,
@@ -5277,7 +5424,7 @@
         }
         cur.offline = true;
         saveCachedLyrics(lyricKey(t), {
-          v: 3, vr: 3, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
+          v: 3, vr: 4, type: 'synced', lines: cur.lines, dur: durSec(t), source: cur.source,
           estimated: !!cur.estimated,
           voiceAligned: !!cur.voiceAligned, voiceRefined: !!cur.voiceRefined, voiceSnap: !!cur.voiceSnap,
           voiceShift: cur.voiceShift,
@@ -5327,7 +5474,7 @@
       return;
     }
     if (L && Array.isArray(L.lines) && L.lines.length) {
-      const how = L.voiceAligned ? 'alineada con la voz'
+      const how = L.voiceAligned ? 'ajuste automático (la letra no venía sincronizada)'
         : L.voiceRefined ? 'desfase corregido'
         : L.voiceWords ? 'palabras pegadas a la voz'
         : L.estimated ? 'avance aproximado' : 'sincronizada';
@@ -5345,6 +5492,26 @@
   // no hay botón ni corrige nada. El detalle completo va en el tooltip.
   function syncBadgeHtml(L) {
     const s = L && L.syncInfo;
+    // Letra que NO venía sincronizada: se estimó o se ajustó a la voz desde
+    // texto simple. El porcentaje se mide sobre esa misma alineación, así que
+    // no es una verificación independiente: se muestra en ámbar y sin número,
+    // nunca como un verde "Sincronía 88 %".
+    if (L && L.type !== 'plain' && (L.voiceAligned || L.estimated)) {
+      const det = [
+        L.estimated && !L.voiceAligned
+          ? 'La letra no traía tiempos: se estimaron por el largo de cada línea.'
+          : 'La letra no venía sincronizada: los tiempos se ajustaron automáticamente a la voz.',
+        'El indicador mide esa misma alineación automática, no una sincronización verificada.',
+        'Puede que alguna línea no coincida exactamente con el cantante.'
+      ];
+      if (s && isFinite(+s.matched) && isFinite(+s.total)) {
+        det.push('Medición orientativa: ' + (+s.matched) + ' de ' + (+s.total) +
+          ' líneas caen junto a una frase vocal.');
+      }
+      return '<span class="ly-sync warn" title="' + esc(det.join(' · ')) + '">' +
+        '<i class="dot"></i>' + (L.estimated && !L.voiceAligned ? 'Avance aproximado' : 'Ajuste automático') +
+        '</span>';
+    }
     // El audio no dio frases vocales suficientes: se informa en vez de dejar la
     // cabecera sin indicador (parecía que el analizador no funcionaba).
     if (L && L.syncNA && (!s || !isFinite(+s.pct))) {
@@ -5436,7 +5603,8 @@
           .map(x => `<div class="ly dim">${esc(x)}</div>`).join('');
       return;
     }
-    const headTxt = L.estimated ? 'letra sin tiempos · avance aproximado'
+    const headTxt = L.voiceAligned ? 'letra ajustada automáticamente a la voz'
+      : L.estimated ? 'letra sin tiempos · avance aproximado'
       : L.voiceWords ? 'palabras pegadas a la voz'
       : (L.source || 'sincronizada con la voz');
     box.innerHTML =
@@ -5875,7 +6043,7 @@
     render(); renderLyrics(); renderNextUp(); savePlaylist();
   };
 
-  // Las letras se descargan autom�ticamente al agregar canciones o restaurar la lista
+  // Las letras se descargan automï¿½ticamente al agregar canciones o restaurar la lista
 
 
   // Descargar de una vez las letras que falten (o mejorar las simples)
@@ -6005,7 +6173,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.2.4';
+  let APP_VERSION = '2.2.5';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.

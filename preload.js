@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // y leer letras sin internet (caché local + archivos .lrc)
 contextBridge.exposeInMainWorld('playerAPI', {
   searchLyrics: (query) => ipcRenderer.invoke('search-lyrics', query),
+  searchLyricsStructured: (payload) => ipcRenderer.invoke('search-lyrics-structured', payload),
   fetchLetras: (payload) => ipcRenderer.invoke('fetch-letras', payload),
 
   // Ruta real de un archivo del sistema (para buscar el .lrc vecino)

@@ -15,6 +15,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Sincronización automática con la voz (análisis de audio)
 - Las letras LRC resaltan palabra por palabra siguiendo la voz del cantante, con relleno progresivo (efecto karaoke fluido)
 - Indicador automático de sincronía con la voz: avisa si la letra va adelantada, atrasada o no coincide (solo informa, no cambia los tiempos)
+- Si la letra no venía sincronizada, el indicador muestra «Ajuste automático» en ámbar en vez de un porcentaje verde engañoso; primero se intenta descargar una letra sincronizada real
 - Verificación de letra correcta (idioma, artista, similitud)
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
