@@ -14,6 +14,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Búsqueda automática de letras (lrclib, letras.com, lyrics.ovh)
 - Sincronización automática con la voz (análisis de audio)
 - Las letras LRC resaltan palabra por palabra siguiendo la voz del cantante
+- Indicador automático de sincronía con la voz: avisa si la letra va adelantada, atrasada o no coincide (solo informa, no cambia los tiempos)
 - Verificación de letra correcta (idioma, artista, similitud)
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar

@@ -338,6 +338,22 @@
   /* Líneas inactivas más tenues: el paso de una línea a otra se ve fluido */
   .lyrics .ly:not(.on):not(.head):not(.dim):not(:hover) { opacity: .7; }
   .ly.head { font-size: 13px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; color: var(--muted); margin-bottom: -4px; }
+  /* Cabecera de letras con el indicador automático de sincronía con la voz */
+  .ly-head-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ly-head-row .ly-head-txt { min-width: 0; }
+  .ly-sync {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700; letter-spacing: .2px; text-transform: none;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--chip); color: var(--muted); white-space: nowrap; line-height: 1.5;
+  }
+  .ly-sync .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+  .ly-sync.ok { border-color: rgba(35,178,109,.55); }
+  .ly-sync.ok .dot { background: #23b26d; box-shadow: 0 0 6px rgba(35,178,109,.75); }
+  .ly-sync.warn { border-color: rgba(240,160,32,.55); }
+  .ly-sync.warn .dot { background: #f0a020; box-shadow: 0 0 6px rgba(240,160,32,.75); }
+  .ly-sync.bad { border-color: var(--danger); }
+  .ly-sync.bad .dot { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
   .ly.dim { color: var(--ly-dim); font-weight: 600; font-size: 19px; }
   .ly-note { font-size: 14.5px; font-weight: 500; color: var(--muted); line-height: 1.65; letter-spacing: 0; }
   .lyrics::-webkit-scrollbar { width: 0; }
@@ -3346,6 +3362,10 @@
     out.voiceRefined = /\[re:[^\]]*desfase[^\]]*\]/i.test(rawText);
     const shm = rawText.match(/\[shift:\s*([+-]?\d+(?:[.,]\d+)?)\s*\]/i);
     if (shm) out.voiceShift = Number(String(shm[1]).replace(',', '.'));
+    // Resultado del analizador de sincronía guardado en el propio .lrc: evita
+    // volver a analizar el audio solo para pintar el indicador.
+    const sym = rawText.match(/\[sync:\s*(\d{1,3})\s*\]/i);
+    if (sym) out.syncPct = Math.max(0, Math.min(100, Number(sym[1]) || 0));
     if (lm && isFinite(+lm[1])) out.alignedDur = +lm[1];
     return out;
   }
@@ -3468,6 +3488,7 @@
       dur: d.dur, estimated: d.estimated, vr: d.vr, verified: d.verified,
       voiceAligned: d.voiceAligned, voiceRefined: d.voiceRefined, voiceSnap: d.voiceSnap,
       voiceWords: d.voiceWords, voiceShift: d.voiceShift,
+      syncInfo: d.syncInfo,
       fileSig: d.fileSig, alignedDur: d.alignedDur
     };
     if (Array.isArray(d.lines) && d.lines.length) return { type: 'synced', lines: d.lines, source: d.source, ...extra };
@@ -3633,6 +3654,16 @@
                 if (lines.voiceWords) L.voiceWords = true;
                 if (lines.voiceRefined) { L.voiceRefined = true; L.voiceShift = lines.voiceShift; }
                 if (lines.alignedDur) L.alignedDur = lines.alignedDur;
+                // Resultado del analizador guardado en el propio .lrc: el
+                // indicador aparece al instante, sin volver a analizar el audio.
+                if (lines.syncPct != null) {
+                  const pct = Math.max(0, Math.min(100, Math.round(lines.syncPct)));
+                  const total = lines.length;
+                  L.syncInfo = {
+                    pct, total, matched: Math.round(total * pct / 100),
+                    offset: 0, verdict: syncVerdictFromPct(pct, 0)
+                  };
+                }
                 setOfflineLyrics(t, L);
                 return;
               }
@@ -4372,6 +4403,13 @@
     L.voiceShift = (L.voiceShift || 0) + d;
     L.voiceRefined = true;
     L.voiceSnap = false;
+    // El ajuste manual mueve la letra: se actualiza el desfase del indicador
+    // para que siga reflejando la realidad (el porcentaje se recalcula en el
+    // siguiente análisis de voz).
+    if (L.syncInfo) {
+      L.syncInfo.offset = Math.round(((L.syncInfo.offset || 0) + d) * 10) / 10;
+      L.syncInfo.verdict = syncVerdictFromPct(L.syncInfo.pct, L.syncInfo.offset);
+    }
     // Si la letra estaba alineada con la voz se conserva la marca para no
     // volver a analizarla; si era aproximada, se dejará re-alinear sola.
     L.voiceAligned = wasAligned && !L.estimated;
@@ -4385,6 +4423,7 @@
       voiceAligned: !!L.voiceAligned, voiceRefined: true, voiceShift: L.voiceShift,
       voiceWords: !!L.voiceWords,
       alignedDur: L.alignedDur,
+      syncInfo: L.syncInfo,
       fileSig: fileSigOf(t, durSec(t))
     });
     // Guardar el .lrc con las marcas ya desplazadas.
@@ -4400,6 +4439,9 @@
         } else if (L.voiceWords) {
           tags.push('[re:palabras-voz]');
           if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
+        }
+        if (L.syncInfo && isFinite(+L.syncInfo.pct)) {
+          tags.push('[sync:' + Math.round(+L.syncInfo.pct) + ']');
         }
         const lrcText = (tags.length ? tags.join('\n') + '\n' : '') +
           L.lines.map(lrcLineText).join('\n');
@@ -4776,8 +4818,11 @@
       if (L.estimated) tags.push('[re:avance aproximado]');
       else if (L.voiceAligned) tags.push('[re:alineada-voz]');
       else if (L.voiceRefined) tags.push('[re:desfase-voz]');
-      else tags.push('[re:palabras-voz]');
+      else if (L.voiceWords) tags.push('[re:palabras-voz]');
       if (L.voiceRefined && isFinite(+L.voiceShift)) tags.push('[shift:' + L.voiceShift + ']');
+      if (L.syncInfo && isFinite(+L.syncInfo.pct)) {
+        tags.push('[sync:' + Math.round(+L.syncInfo.pct) + ']');
+      }
       if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
       g.saveLrc(fp, tags.join('\n') + '\n' + L.lines.map(lrcLineText).join('\n')).catch(() => {});
     } catch (e) { }
@@ -5000,6 +5045,84 @@
     return added;
   }
 
+  // Analizador automático de sincronía: mide, SIN mover nada, qué tan bien
+  // encajan los inicios de las líneas con la voz detectada en el audio.
+  // Devuelve { pct, total, matched, offset, verdict } o null si no hay datos
+  // suficientes. Se guarda en la letra para no repetir el análisis.
+  function voiceSyncInfo(L, A, dur) {
+    if (!L || !Array.isArray(L.lines)) return null;
+    // Frases vocales con energía suficiente: las instrumentales sueltas no
+    // cuentan (el detector las marca con poca energía).
+    const phrases = (Array.isArray(A && A.phrases) ? A.phrases : [])
+      .filter(p => p && isFinite(p.t) && isFinite(p.end) && p.end > p.t)
+      .filter(p => (p.eff === undefined || p.eff >= 0.55) || (p.end - p.t) >= 1.6)
+      .sort((a, b) => a.t - b.t);
+    if (phrases.length < 4) return null;
+    const lines = L.lines.filter(l => l && isFinite(+l.t) && +l.t >= 0 &&
+      String(l.text || '').trim());
+    if (lines.length < 5) return null;
+
+    // Acierto: la línea empieza dentro de una frase vocal (con un margen
+    // pequeño). En los huecos instrumentales largos no hay frase: esas líneas
+    // no cuentan como acierto, que es justo lo que queremos detectar.
+    let matched = 0;
+    for (const l of lines) {
+      const s = +l.t;
+      if (phrases.some(p => s >= p.t - 0.5 && s <= p.end + 0.5)) matched++;
+    }
+    const pct = Math.round(matched * 100 / lines.length);
+
+    // Desfase global: se miran solo las líneas que abren frase (las que vienen
+    // tras un silencio en la letra) y se compara su inicio con el inicio de la
+    // frase vocal más cercana. Es más estable que emparejar todas las pausas y
+    // detecta adelantos/atrasos de medio segundo a dos segundos.
+    let offset = 0;
+    const times = lines.map(l => +l.t);
+    const ev = [];
+    for (let i = 0; i < times.length; i++) {
+      if (i === 0 || times[i] - times[i - 1] >= 1.2) ev.push(times[i]);
+    }
+    const ds = [];
+    for (const x of ev) {
+      let bd = Infinity, bp = null;
+      for (const p of phrases) {
+        const d = Math.abs(p.t - x);
+        if (d < bd) { bd = d; bp = p.t; }
+      }
+      if (bd <= 2.5) ds.push(x - bp);
+    }
+    const median = (arr) => {
+      const a = arr.slice().sort((x, y) => x - y);
+      return a.length ? a[Math.floor(a.length / 2)] : 0;
+    };
+    if (ds.length >= 6) {
+      const m0 = median(ds);
+      const inl = ds.filter(d => Math.abs(d - m0) <= 1.0);
+      if (inl.length >= 6 && inl.length >= ds.length * 0.35) {
+        offset = Math.round(median(inl) * 10) / 10;
+      }
+    }
+
+    const ad = Math.abs(offset);
+    const verdict = pct < 65 ? 'bad'
+      : (ad >= 0.4 || pct < 85) ? 'warn'
+      : 'ok';
+    return {
+      pct,
+      total: lines.length,
+      matched,
+      offset,
+      verdict
+    };
+  }
+
+  // Veredicto cuando solo se conoce el porcentaje guardado en el .lrc.
+  function syncVerdictFromPct(pct, offset) {
+    const p = Number(pct) || 0;
+    const ad = Math.abs(Number(offset) || 0);
+    return p < 65 ? 'bad' : (ad >= 0.4 || p < 85) ? 'warn' : 'ok';
+  }
+
   async function maybeAlignToVoice(t) {
     if (!t || state.tracks[state.index] !== t) return;
     const L = t.lyrics;
@@ -5008,17 +5131,13 @@
     // anterior)? Si no, conviene analizar la voz aunque la línea ya esté pegada.
     const hasVoiceWords = (X) => !!(X && (X.voiceWords ||
       (Array.isArray(X.lines) && X.lines.some(l => Array.isArray(l.words) && l.words.length > 1))));
-    // Si ya se alineó/refinó pero para un archivo distinto (original vs GMV/remix),
-    // volver a analizar contra el audio actual.
+    // Si ya se analizó este mismo archivo y se midió la sincronía, no repetir.
+    // El indicador vive en la letra, así que basta con tenerlo guardado.
     const curFileSig = fileSigOf(t, durSec(t));
-    if ((L.voiceAligned || L.voiceRefined || L.voiceSnap || L.voiceWords) &&
-        curFileSig && L.fileSig === curFileSig && hasVoiceWords(L)) return;
-    // LRC ya alineado con la voz para este mismo audio: no hace falta volver a
-    // analizarlo ni arriesgarse a que un refinamiento posterior lo mueva. Salvo
-    // que le falten las marcas por palabra.
     const durNow = durSec(t);
-    if ((L.voiceAligned || L.voiceWords || L.voiceRefined) && hasVoiceWords(L) &&
-        isFinite(L.alignedDur) && durNow &&
+    if (L.syncInfo && curFileSig && L.fileSig === curFileSig) return;
+    // .lrc del disco ya medido para esta misma duración: tampoco se repite.
+    if (L.syncInfo && isFinite(L.alignedDur) && durNow &&
         Math.abs(L.alignedDur - durNow) <= 2) {
       L.fileSig = curFileSig;
       return;
@@ -5088,12 +5207,21 @@
         // Un LRC que ya traía marcas por palabra también cuenta como corregido:
         // no hay que volver a analizarlo en cada reproducción.
         if (cur.type === 'synced' && hasVoiceWords(cur)) cur.voiceWords = true;
-        if (cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) {
-          // Guardar la firma en memoria: evita repetir el análisis en cada render.
-          cur.fileSig = fileSigOf(t, durSec(t));
-          if (cur.voiceAligned) cur.alignedDur = Math.round(durSec(t) || 0) || undefined;
+
+        // ANALIZADOR AUTOMÁTICO: se mide la sincronía final (después de pegar la
+        // letra a la voz, si hacía falta). El resultado solo informa: no mueve
+        // ninguna línea. Se guarda con la letra para no reanalizar el audio.
+        const info = voiceSyncInfo(cur, A, durSec(t));
+        if (info) cur.syncInfo = info;
+
+        // Guardar la firma y la duración: evita repetir el análisis en cada render.
+        if (info || cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) {
+          cur.fileSig = curFileSig2;
         }
-        if (!cur.voiceAligned && !cur.voiceRefined && !cur.voiceSnap && !cur.voiceWords) {
+        if (info || cur.voiceAligned) {
+          cur.alignedDur = Math.round(durSec(t) || 0) || undefined;
+        }
+        if (!cur.voiceAligned && !cur.voiceRefined && !cur.voiceSnap && !cur.voiceWords && !info) {
           t._voiceSkipUntil = Date.now() + 180000;      // no repetir el análisis
           dbg(cur.type === 'synced'
             ? 'voz: el LRC ya coincide con el audio (sin corrección)'
@@ -5108,6 +5236,7 @@
               voiceShift: cur.voiceShift,
               voiceWords: !!cur.voiceWords,
               alignedDur: cur.alignedDur,
+              syncInfo: cur.syncInfo,
               fileSig: fileSigOf(t, durSec(t))
             });
           }
@@ -5121,23 +5250,15 @@
           voiceShift: cur.voiceShift,
           voiceWords: !!cur.voiceWords,
           alignedDur: cur.alignedDur,
+          syncInfo: cur.syncInfo,
           fileSig: fileSigOf(t, durSec(t))
         });
-        // Guardar el LRC con marcas por palabra junto al audio: así el resaltado
-        // fino sobrevive sin caché (otro PC, sin internet) y no hay que repetir
-        // el análisis de voz en cada reproducción.
+        // Guardar el LRC junto al audio con las etiquetas (palabras, desfase y
+        // resultado del analizador). Se escribe aunque no haya palabras para que
+        // el indicador de sincronía sobreviva sin caché (otro PC, sin internet).
         if (Array.isArray(cur.lines) && cur.lines.length >= 3 &&
-            cur.lines.some(l => Array.isArray(l.words) && l.words.length > 1)) {
-          try {
-            const tags = [];
-            if (cur.estimated) tags.push('[re:avance aproximado]');
-            else if (cur.voiceAligned) tags.push('[re:alineada-voz]');
-            else if (cur.voiceRefined) tags.push('[re:desfase-voz]');
-            else tags.push('[re:palabras-voz]');
-            if (cur.voiceRefined && isFinite(+cur.voiceShift)) tags.push('[shift:' + cur.voiceShift + ']');
-            if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
-            g.saveLrc(fp, tags.join('\n') + '\n' + cur.lines.map(lrcLineText).join('\n')).catch(() => {});
-          } catch (e) { }
+            (cur.syncInfo || hasVoiceWords(cur))) {
+          saveRefinedLrc(t, cur);
         }
         // Si se analizó solo para añadir palabras y no se pudieron añadir, no
         // repetir el análisis en bucle en cada repintado de la letra.
@@ -5146,7 +5267,8 @@
         dbg('letra pegada a la voz [' + String(t.title || '').slice(0, 26) + ']: ' +
             (cur.voiceAligned ? 'alineada' : cur.voiceRefined ? 'desfase ' + cur.voiceShift + 's'
               : cur.voiceWords ? 'palabras' : 'sin cambios') +
-            ' frases=' + A.phrases.length);
+            ' frases=' + A.phrases.length +
+            (cur.syncInfo ? ' sincronía=' + cur.syncInfo.pct + '%' : ''));
       } catch (e) {
         t._voiceSkipUntil = Date.now() + 60000;
         dbg('análisis de voz: ' + (e && e.message || e));
@@ -5183,6 +5305,34 @@
     } else if (L && L.type === 'none') {
       el.textContent = netBlocked() ? '✕ sin letra · sin conexión' : '✕ sin letra';
     } else el.textContent = '';
+  }
+
+  // Indicador visual del analizador automático de sincronía. Solo informa:
+  // no hay botón ni corrige nada. El detalle completo va en el tooltip.
+  function syncBadgeHtml(L) {
+    const s = L && L.syncInfo;
+    if (!s || !isFinite(+s.pct)) return '';
+    const pct = Math.max(0, Math.min(100, Math.round(+s.pct)));
+    const off = Number(s.offset) || 0;
+    const cls = s.verdict || syncVerdictFromPct(pct, off);
+    let txt;
+    if (cls === 'bad') txt = 'No coincide con la voz';
+    else if (Math.abs(off) >= 0.4) {
+      txt = (off > 0 ? 'Va atrasada ' : 'Va adelantada ') + Math.abs(off).toFixed(1) + ' s';
+    } else {
+      txt = 'Sincronía ' + pct + ' %';
+    }
+    const det = [];
+    if (isFinite(+s.matched) && isFinite(+s.total)) {
+      det.push(+s.matched + ' de ' + +s.total + ' líneas empiezan junto a la voz (±0.5 s)');
+    }
+    if (Math.abs(off) >= 0.4) {
+      det.push('Desfase estimado ' + (off > 0 ? '+' : '') + off.toFixed(1) + ' s: la letra va ' +
+        (off > 0 ? 'atrasada' : 'adelantada'));
+    }
+    if (cls === 'bad') det.push('Puede ser de otra versión o tener tiempos aproximados');
+    return '<span class="ly-sync ' + cls + '" title="' + esc(det.join(' · ')) + '">' +
+      '<i class="dot"></i>' + esc(txt) + '</span>';
   }
 
   function renderLyrics() {
@@ -5250,7 +5400,7 @@
       : L.voiceWords ? 'palabras pegadas a la voz'
       : (L.source || 'sincronizada con la voz');
     box.innerHTML =
-      `<div class="ly head">${esc(headTxt)}</div>` +
+      `<div class="ly head ly-head-row"><span class="ly-head-txt">${esc(headTxt)}</span>${syncBadgeHtml(L)}</div>` +
       L.lines.map((ln, i) =>
       `<div class="ly" data-t="${ln.t}" data-i="${i}">${esc(ln.text)}</div>`).join('');
     box.querySelectorAll('.ly[data-t]').forEach(el => {
@@ -5803,7 +5953,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.2.1';
+  let APP_VERSION = '2.2.2';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
