@@ -2464,6 +2464,132 @@
     transform: translateY(calc(-3px - var(--voice, 0) * 2px)) scale(calc(1.08 + var(--voice, 0) * 0.03));
   }
 
+  /* ---------- Estilos de letra añadidos en 2.3.2 (17–32) ---------- */
+  /* 17. Rebote */
+  body[data-ly="rebote"] .lyrics .ly.on .w.cur {
+    transform: translateY(calc(-8px - var(--voice, 0) * 4px)) scale(1.1);
+    color: var(--accent); -webkit-text-fill-color: var(--accent); background: none;
+  }
+  body[data-ly="rebote"] .lyrics .ly.on .w.done {
+    transform: translateY(-2px); color: var(--accent); -webkit-text-fill-color: var(--accent);
+  }
+
+  /* 18. Onda */
+  body[data-ly="onda"] .lyrics .ly.on .w.cur {
+    animation: lyWave 1s ease-in-out infinite;
+    color: var(--accent); -webkit-text-fill-color: var(--accent); background: none;
+  }
+  @keyframes lyWave { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+  /* 19. Láser */
+  body[data-ly="laser"] .lyrics .ly.on .w.cur {
+    border-bottom: 2px solid var(--accent);
+    box-shadow: 0 3px 12px var(--accent);
+    color: var(--accent); -webkit-text-fill-color: var(--accent); background: none;
+  }
+
+  /* 20. Chispa */
+  body[data-ly="chispa"] .lyrics .ly.on .w.cur {
+    color: #fff; -webkit-text-fill-color: #fff;
+    text-shadow: 0 0 6px #fff, 0 0 calc(12px + var(--voice, 0) * 16px) var(--accent), 0 0 30px var(--accent);
+    background: none;
+  }
+
+  /* 21. Desliz */
+  body[data-ly="desliz"] .lyrics .ly.on .w { transition: opacity .3s, transform .35s cubic-bezier(.22,1,.36,1), color .3s; }
+  body[data-ly="desliz"] .lyrics .ly.on .w:not(.done):not(.cur) { opacity: 0; transform: translateX(-12px); }
+  body[data-ly="desliz"] .lyrics .ly.on .w.cur {
+    opacity: 1; transform: translateX(0) scale(1.05);
+    color: var(--accent); -webkit-text-fill-color: var(--accent); background: none;
+  }
+  body[data-ly="desliz"] .lyrics .ly.on .w.done {
+    opacity: 1; transform: translateX(0); color: var(--text); -webkit-text-fill-color: var(--text);
+  }
+
+  /* 22. Cartel */
+  body[data-ly="cartel"] .lyrics .ly { font-family: Impact, "Arial Black", sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+  body[data-ly="cartel"] .lyrics .ly.on .w.cur {
+    color: #fff; -webkit-text-fill-color: #fff;
+    text-shadow: 3px 3px 0 var(--accent), 6px 6px 0 rgba(0,0,0,.3);
+    background: none; transform: scale(1.08);
+  }
+
+  /* 23. Cuaderno */
+  body[data-ly="cuaderno"] .lyrics .ly { font-family: "Segoe Print", "Bradley Hand", cursive; }
+  body[data-ly="cuaderno"] .lyrics .ly.on .w.cur {
+    color: #2b3a67; -webkit-text-fill-color: #2b3a67;
+    background: #eef1fa; border-radius: 4px; padding: 0 3px; transform: translateY(-2px);
+  }
+
+  /* 24. Estrella */
+  body[data-ly="estrella"] .lyrics .ly.on .w.cur {
+    color: #fff; -webkit-text-fill-color: #fff;
+    text-shadow: 0 0 4px #fff, 0 0 10px #ffd700, 0 0 20px #ffd700, 0 0 40px #ff8c00;
+    background: none;
+  }
+
+  /* 25. Fuego */
+  body[data-ly="fuego"] .lyrics .ly.on .w.cur {
+    color: #ff9a3c; -webkit-text-fill-color: #ff9a3c;
+    text-shadow: 0 0 6px #ff5a1a, 0 0 18px #ff2a00, 0 -2px 20px #ffd27a;
+    background: none; animation: lyFlame .6s ease-in-out infinite alternate;
+  }
+  @keyframes lyFlame {
+    0% { text-shadow: 0 0 6px #ff5a1a, 0 0 18px #ff2a00; }
+    100% { text-shadow: 0 0 10px #ff9a3c, 0 0 28px #ff2a00, 0 -4px 30px #ffd27a; }
+  }
+
+  /* 26. Sombra */
+  body[data-ly="sombra"] .lyrics .ly.on .w.cur {
+    color: #fff; -webkit-text-fill-color: #fff;
+    text-shadow: 4px 4px 0 var(--accent), 8px 8px 0 rgba(0,0,0,.4);
+    background: none; transform: translate(-2px,-2px) scale(1.05);
+  }
+
+  /* 27. Doble */
+  body[data-ly="doble"] .lyrics .ly.on .w.cur {
+    color: var(--accent); -webkit-text-fill-color: var(--accent);
+    text-shadow: 3px 3px 0 var(--viz2);
+    background: none;
+  }
+
+  /* 28. Invertido */
+  body[data-ly="invertido"] .lyrics .ly.on .w.cur {
+    background: var(--text); color: var(--bg); -webkit-text-fill-color: var(--bg);
+    padding: 0 3px; border-radius: 3px; box-shadow: 0 0 0 2px var(--text);
+  }
+
+  /* 29. Rotación */
+  body[data-ly="rotacion"] .lyrics .ly.on .w.cur {
+    color: var(--accent); -webkit-text-fill-color: var(--accent);
+    transform: rotate(calc(-3deg + var(--voice, 0) * 6deg)) scale(1.1);
+    background: none;
+  }
+
+  /* 30. Espacial */
+  body[data-ly="espacial"] .lyrics .ly { perspective: 400px; }
+  body[data-ly="espacial"] .lyrics .ly.on .w.cur {
+    color: #fff; -webkit-text-fill-color: #fff;
+    text-shadow: 0 0 5px #0ff, 0 0 15px #00f, 0 0 30px #00f;
+    background: none; transform: translateZ(10px) scale(1.08);
+  }
+
+  /* 31. Sonar */
+  body[data-ly="sonar"] .lyrics .ly.on .w.cur {
+    color: #0ff; -webkit-text-fill-color: #0ff;
+    text-shadow: 0 0 4px #0ff, 0 0 12px #0ff;
+    background: none; animation: lyRadar .5s ease-out infinite;
+  }
+  @keyframes lyRadar { 0% { opacity: 1; } 100% { opacity: .6; } }
+
+  /* 32. Mosaico */
+  body[data-ly="mosaico"] .lyrics .ly { font-family: "Cascadia Mono", Consolas, monospace; letter-spacing: 2px; }
+  body[data-ly="mosaico"] .lyrics .ly.on .w.cur {
+    color: var(--accent); -webkit-text-fill-color: var(--accent);
+    text-shadow: 2px 0 0 var(--bg), -2px 0 0 var(--bg), 0 2px 0 var(--bg), 0 -2px 0 var(--bg);
+    background: none;
+  }
+
   /* ---------- Selector de tema y estilo (pestaña "Tema") ---------- */
   .setwrap { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 22px; display: flex; flex-direction: column; gap: 24px; }
   .setsec h3 { font-size: 12.5px; font-weight: 750; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); margin-bottom: 11px; }
@@ -2513,6 +2639,22 @@
   .lyw .p15 { font-family: "Segoe Script", "Bradley Hand", cursive; font-size: 15px; font-weight: 600; color: var(--accent); transform: rotate(-1.2deg); }
   .lyw .p16 { font-size: 14.5px; font-weight: 750; color: var(--text); }
   .lyw .p16 i { font-style: normal; background: var(--accent); color: var(--bg); border-radius: 5px; padding: 0 5px; box-shadow: 0 0 0 1px var(--accent); }
+  .lyw .p17 { font-size: 15.5px; font-weight: 800; color: var(--text); transform: translateY(-2px); }
+  .lyw .p18 { font-size: 15.5px; font-weight: 750; color: var(--text); }
+  .lyw .p19 { font-size: 15.5px; font-weight: 750; color: var(--accent); border-bottom: 2px solid var(--accent); }
+  .lyw .p20 { font-size: 15.5px; font-weight: 800; color: #fff; text-shadow: 0 0 6px #fff, 0 0 12px var(--accent); }
+  .lyw .p21 { font-size: 15.5px; font-weight: 750; color: var(--text); }
+  .lyw .p22 { font-family: Impact, "Arial Black", sans-serif; font-size: 14.5px; letter-spacing: 1px; color: #fff; text-shadow: 2px 2px 0 var(--accent); text-transform: uppercase; }
+  .lyw .p23 { font-family: "Segoe Print", "Bradley Hand", cursive; font-size: 14px; font-weight: 600; color: #2b3a67; background: #eef1fa; border-radius: 4px; padding: 0 5px; }
+  .lyw .p24 { font-size: 15.5px; font-weight: 800; color: #fff; text-shadow: 0 0 6px #fff, 0 0 14px #ffd700; }
+  .lyw .p25 { font-size: 15.5px; font-weight: 800; color: #ff9a3c; text-shadow: 0 0 8px #ff5a1a, 0 0 18px #ff2a00; }
+  .lyw .p26 { font-size: 15.5px; font-weight: 850; color: #fff; text-shadow: 3px 3px 0 var(--accent), 6px 6px 0 rgba(0,0,0,.35); }
+  .lyw .p27 { font-size: 15.5px; font-weight: 800; color: var(--accent); text-shadow: 3px 3px 0 var(--viz2); }
+  .lyw .p28 { font-size: 14.5px; font-weight: 750; color: var(--bg); background: var(--text); border-radius: 4px; padding: 0 6px; }
+  .lyw .p29 { font-size: 15.5px; font-weight: 800; color: var(--accent); transform: rotate(-3deg); }
+  .lyw .p30 { font-size: 15.5px; font-weight: 800; color: #fff; text-shadow: 0 0 5px #0ff, 0 0 14px #00f; }
+  .lyw .p31 { font-size: 15.5px; font-weight: 800; color: #0ff; text-shadow: 0 0 4px #0ff, 0 0 12px #0ff; }
+  .lyw .p32 { font-family: "Cascadia Mono", Consolas, monospace; font-size: 14px; font-weight: 700; letter-spacing: 2px; color: var(--accent); }
 
   /* ---------- Responsive ---------- */
   @media (max-width: 900px) {
@@ -2564,7 +2706,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.1</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.2</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -2762,6 +2904,22 @@
               <button class="lyw" data-v="typewriter"><span class="p14">Letra de la canción</span><b>Typewriter</b></button>
               <button class="lyw" data-v="manuscrito"><span class="p15">Letra de la canción</span><b>Manuscrito</b></button>
               <button class="lyw" data-v="palabra"><span class="p16">Letra de la <i>canción</i></span><b>Palabra</b></button>
+              <button class="lyw" data-v="rebote"><span class="p17">Letra de la canción</span><b>Rebote</b></button>
+              <button class="lyw" data-v="onda"><span class="p18">Letra de la canción</span><b>Onda</b></button>
+              <button class="lyw" data-v="laser"><span class="p19">Letra de la canción</span><b>Láser</b></button>
+              <button class="lyw" data-v="chispa"><span class="p20">Letra de la canción</span><b>Chispa</b></button>
+              <button class="lyw" data-v="desliz"><span class="p21">Letra de la canción</span><b>Desliz</b></button>
+              <button class="lyw" data-v="cartel"><span class="p22">Letra de la canción</span><b>Cartel</b></button>
+              <button class="lyw" data-v="cuaderno"><span class="p23">Letra de la canción</span><b>Cuaderno</b></button>
+              <button class="lyw" data-v="estrella"><span class="p24">Letra de la canción</span><b>Estrella</b></button>
+              <button class="lyw" data-v="fuego"><span class="p25">Letra de la canción</span><b>Fuego</b></button>
+              <button class="lyw" data-v="sombra"><span class="p26">Letra de la canción</span><b>Sombra</b></button>
+              <button class="lyw" data-v="doble"><span class="p27">Letra de la canción</span><b>Doble</b></button>
+              <button class="lyw" data-v="invertido"><span class="p28">Letra de la canción</span><b>Invertido</b></button>
+              <button class="lyw" data-v="rotacion"><span class="p29">Letra de la canción</span><b>Rotación</b></button>
+              <button class="lyw" data-v="espacial"><span class="p30">Letra de la canción</span><b>Espacial</b></button>
+              <button class="lyw" data-v="sonar"><span class="p31">Letra de la canción</span><b>Sonar</b></button>
+              <button class="lyw" data-v="mosaico"><span class="p32">Letra de la canción</span><b>Mosaico</b></button>
             </div>
             <p class="hint">Cómo se resalta la línea que suena. Se combina con cualquier tema y cualquier estilo del reproductor.</p>
           </div>
@@ -6607,7 +6765,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.1';
+  let APP_VERSION = '2.3.2';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
