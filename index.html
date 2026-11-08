@@ -334,6 +334,7 @@
   .tab:hover:not(.active) { color: var(--text); transform: translateY(-1px); }
   .tab:active { transform: scale(.96); }
   .tab.active { background: var(--tool); color: var(--text); box-shadow: 0 4px 14px rgba(20,24,60,.14); transform: translateY(-1px); }
+  .tab-ic { font-size: 14.5px; line-height: 1; display: inline-flex; align-items: center; }
   .search { position: relative; margin: 10px 0; animation: panelIn .32s cubic-bezier(.22,1,.36,1) both; }
   .search .ic { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--muted); pointer-events: none; transition: color .2s ease; }
   .search input {
@@ -2594,6 +2595,37 @@
   .setwrap { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 22px; display: flex; flex-direction: column; gap: 24px; }
   .setsec h3 { font-size: 12.5px; font-weight: 750; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); margin-bottom: 11px; }
   .setsec p.hint { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin-top: 10px; }
+
+  /* Menú de categorías de la pestaña Tema (eficiente: 3 opciones grandes) */
+  .tema-menu { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .tema-cat {
+    display: flex; align-items: center; gap: 13px; text-align: left;
+    padding: 15px 16px; border-radius: 14px; border: 1.5px solid var(--line);
+    background: var(--tool); color: var(--text); cursor: pointer;
+    transition: transform .22s cubic-bezier(.22,1,.36,1), border-color .2s ease, box-shadow .22s ease, background .2s ease;
+  }
+  .tema-cat:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.18); background: var(--accent-soft); }
+  .tema-cat:active { transform: translateY(0) scale(.985); }
+  .tema-cat .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 21px; background: var(--chip); flex: none; }
+  .tema-cat .txt { min-width: 0; }
+  .tema-cat b { display: block; font-size: 14.5px; font-weight: 800; }
+  .tema-cat small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+  .tema-cat .arrow { margin-left: auto; color: var(--muted); font-size: 22px; line-height: 1; flex: none; }
+  .tema-back {
+    align-self: flex-start; margin-bottom: 14px;
+    padding: 7px 14px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--chip); color: var(--muted); font-size: 12.5px; font-weight: 700; cursor: pointer;
+    transition: .15s;
+  }
+  .tema-back:hover { border-color: var(--accent); color: var(--accent); }
+  .tema-sec { display: flex; flex-direction: column; }
+  .tema-sec[hidden], .tema-menu[hidden] { display: none !important; }
+  .set-current {
+    display: inline-block; margin-left: 7px; padding: 2px 8px; border-radius: 99px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 10.5px; font-weight: 800; letter-spacing: 0; text-transform: none;
+    vertical-align: middle;
+  }
   .swrow { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
   .sw {
     display: flex; align-items: center; gap: 9px; padding: 11px 12px;
@@ -2706,7 +2738,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.2</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.3</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -2764,9 +2796,9 @@
       </div>
 
       <div class="chips">
-        <button class="chip on" id="chipLyrics">Letras</button>
-        <button class="chip" id="chipCredits">Créditos</button>
-        <button class="chip" id="chipVideo">Video</button>
+        <button class="chip on" id="chipLyrics"><span class="tab-ic">📝</span> Letras</button>
+        <button class="chip" id="chipCredits"><span class="tab-ic">💿</span> Créditos</button>
+        <button class="chip" id="chipVideo"><span class="tab-ic">🎬</span> Video</button>
       </div>
 
       <div class="vizwrap"><canvas id="viz"></canvas></div>
@@ -2776,10 +2808,10 @@
     <aside class="panel side">
       <div class="side-head">
         <div class="tabs" role="tablist">
-          <button class="tab active" id="tabLyrics" role="tab"><svg class="ic" style="width:15px;height:15px"><use href="#i-lyrics"/></svg> Letras</button>
-          <button class="tab" id="tabList" role="tab"><svg class="ic" style="width:15px;height:15px"><use href="#i-list"/></svg> Lista</button>
-          <button class="tab" id="tabEq" role="tab"><svg class="ic" style="width:15px;height:15px"><use href="#i-eq"/></svg> EQ</button>
-          <button class="tab" id="tabTema" role="tab"><svg class="ic" style="width:15px;height:15px"><use href="#i-pal"/></svg> Tema</button>
+          <button class="tab active" id="tabLyrics" role="tab"><span class="tab-ic">📝</span> Letras</button>
+          <button class="tab" id="tabList" role="tab"><span class="tab-ic">📋</span> Lista</button>
+          <button class="tab" id="tabEq" role="tab"><span class="tab-ic">🎚️</span> EQ</button>
+          <button class="tab" id="tabTema" role="tab"><span class="tab-ic">🎨</span> Tema</button>
         </div>
         <div class="search" id="searchBox" hidden>
           <svg class="ic"><use href="#i-search"/></svg>
@@ -2832,8 +2864,29 @@
       <!-- Tema y estilo de letras -->
       <div class="panelview" id="viewTema" hidden>
         <div class="setwrap">
+          <!-- Menú de categorías: lo primero que se ve al entrar a Tema -->
+          <div class="tema-menu" id="temaMenu">
+            <button class="tema-cat" data-cat="theme">
+              <span class="ic">🎨</span>
+              <span class="txt"><b>Tema del reproductor</b><small id="catThemeName">Claro</small></span>
+              <span class="arrow">›</span>
+            </button>
+            <button class="tema-cat" data-cat="style">
+              <span class="ic">🎛️</span>
+              <span class="txt"><b>Estilo del reproductor</b><small id="catStyleName">Normal (por defecto)</small></span>
+              <span class="arrow">›</span>
+            </button>
+            <button class="tema-cat" data-cat="lyric">
+              <span class="ic">✍️</span>
+              <span class="txt"><b>Estilo de las letras</b><small id="catLyricName">Minimal</small></span>
+              <span class="arrow">›</span>
+            </button>
+          </div>
+
+          <div class="tema-sec" data-sec="theme" hidden>
+            <button class="tema-back" data-back>← Volver a las opciones</button>
           <div class="setsec">
-            <h3>Tema del reproductor</h3>
+            <h3>Tema del reproductor <span class="set-current" id="curTheme">—</span></h3>
             <div class="swrow" id="themeSw">
               <button class="sw" data-v="claro"><i style="background:linear-gradient(135deg,#f6f6fa 40%,#5f7cff)"></i> Claro</button>
               <button class="sw" data-v="oscuro"><i style="background:linear-gradient(135deg,#0f1015 40%,#7d8dff)"></i> Oscuro</button>
@@ -2860,8 +2913,12 @@
             </div>
             <p class="hint">El tema se guarda y se aplica también la próxima vez que abras la app.</p>
           </div>
+          </div>
+
+          <div class="tema-sec" data-sec="style" hidden>
+            <button class="tema-back" data-back>← Volver a las opciones</button>
           <div class="setsec">
-            <h3>Estilo del reproductor</h3>
+            <h3>Estilo del reproductor <span class="set-current" id="curStyle">—</span></h3>
             <div class="swrow" id="stSw">
               <button class="sw" data-v="normal"><i style="background:linear-gradient(135deg,#8a8a99 40%,#5f7cff)"></i> Normal (por defecto)</button>
               <button class="sw" data-v="cassette"><i style="background:linear-gradient(135deg,#3a2f22 40%,#ff9f43)"></i> Cassette retro</button>
@@ -2885,8 +2942,12 @@
             </div>
             <p class="hint">Todo se combina: el <b>Tema</b> da los colores, el <b>Estilo del reproductor</b> la decoración y animaciones, y el <b>Estilo de las letras</b> la tipografía. Se guarda para la próxima vez.</p>
           </div>
+          </div>
+
+          <div class="tema-sec" data-sec="lyric" hidden>
+            <button class="tema-back" data-back>← Volver a las opciones</button>
           <div class="setsec">
-            <h3>Estilo de las letras</h3>
+            <h3>Estilo de las letras <span class="set-current" id="curLyric">—</span></h3>
             <div class="lyrow" id="lySw">
               <button class="lyw" data-v="minimal"><span class="p1">Letra de la canción</span><b>Minimal</b></button>
               <button class="lyw" data-v="grande"><span class="p2">Letra de la canción</span><b>Grande</b></button>
@@ -2922,6 +2983,7 @@
               <button class="lyw" data-v="mosaico"><span class="p32">Letra de la canción</span><b>Mosaico</b></button>
             </div>
             <p class="hint">Cómo se resalta la línea que suena. Se combina con cualquier tema y cualquier estilo del reproductor.</p>
+          </div>
           </div>
         </div>
       </div>
@@ -6388,6 +6450,8 @@
     $('viewTema').hidden = which !== 'tema';
     $('searchBox').hidden = which !== 'list';
     if (which === 'lyrics') syncLyrics(true);
+    // Al entrar a Tema se muestra primero el menú de las 3 opciones
+    if (which === 'tema' && typeof showTemaCat === 'function') showTemaCat(null);
   }
   $('tabLyrics').onclick = () => showTab('lyrics');
   $('tabList').onclick = () => showTab('list');
@@ -6441,11 +6505,51 @@
     document.querySelectorAll('#themeSw .sw').forEach(b => b.classList.toggle('on', b.dataset.v === th));
     document.querySelectorAll('#lySw .lyw').forEach(b => b.classList.toggle('on', b.dataset.v === ly));
     document.querySelectorAll('#stSw .sw').forEach(b => b.classList.toggle('on', b.dataset.v === st));
+    // Etiqueta de la opción actual en cada sección de la pestaña Tema
+    const thOn = document.querySelector('#themeSw .sw.on');
+    const stOn = document.querySelector('#stSw .sw.on');
+    const lyOn = document.querySelector('#lySw .lyw.on');
+    const eTh = document.getElementById('curTheme');
+    const eSt = document.getElementById('curStyle');
+    const eLy = document.getElementById('curLyric');
+    if (eTh) eTh.textContent = thOn ? thOn.textContent.trim() : th;
+    if (eSt) eSt.textContent = stOn ? stOn.textContent.trim() : st;
+    if (eLy) {
+      const b = lyOn && lyOn.querySelector('b');
+      eLy.textContent = b ? b.textContent.trim() : ly;
+    }
+    // Nombres actuales en el menú de categorías
+    const cTh = document.getElementById('catThemeName');
+    const cSt = document.getElementById('catStyleName');
+    const cLy = document.getElementById('catLyricName');
+    if (cTh) cTh.textContent = thOn ? thOn.textContent.trim() : th;
+    if (cSt) cSt.textContent = stOn ? stOn.textContent.trim() : st;
+    if (cLy) {
+      const b = lyOn && lyOn.querySelector('b');
+      cLy.textContent = b ? b.textContent.trim() : ly;
+    }
     refreshVizCols();   // las barras del visualizador cambian con el tema
     syncTitleBar();     // la barra de título nativa también sigue al tema
   }
   if (window.playerAPI) document.body.classList.add('wco');
   applyLook();
+
+  /* --- Navegación del menú de la pestaña Tema: 3 opciones → contenido → volver --- */
+  function showTemaCat(cat) {
+    const menu = document.getElementById('temaMenu');
+    const secs = document.querySelectorAll('.tema-sec');
+    if (menu) menu.hidden = !!cat;
+    secs.forEach(s => { s.hidden = s.dataset.sec !== cat; });
+    const wrap = document.querySelector('#viewTema .setwrap');
+    if (wrap) wrap.scrollTop = 0;
+  }
+  document.querySelectorAll('.tema-cat').forEach(b => {
+    b.onclick = () => showTemaCat(b.dataset.cat);
+  });
+  document.querySelectorAll('.tema-back').forEach(b => {
+    b.onclick = () => showTemaCat(null);
+  });
+
   document.querySelectorAll('#themeSw .sw').forEach(b => {
     b.onclick = () => {
       try { localStorage.setItem('rp-theme', b.dataset.v); } catch (e) {}
@@ -6765,7 +6869,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.2';
+  let APP_VERSION = '2.3.3';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
