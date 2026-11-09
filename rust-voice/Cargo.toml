@@ -1,0 +1,16 @@
+[package]
+name = "voice-analyzer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+symphonia = { version = "0.5", features = ["mp3", "aac", "isomp4", "ogg", "vorbis", "flac", "wav", "pcm"] }
+rustfft = "6.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

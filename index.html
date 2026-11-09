@@ -937,7 +937,7 @@
   }
   @keyframes stSnow { from { transform: translateY(-16px); opacity: 0; } 14% { opacity: .95; } 82% { opacity: .8; } to { transform: translateY(240px); opacity: 0; } }
   body[data-st="frost"] .now h1 { text-shadow: 0 1px 0 rgba(255,255,255,.85); }
-  body[data-st="frost"] .lyrics .ly.on { animation: stFocus 1s ease; }
+  body[data-st="frost"][data-ly="minimal"] .lyrics .ly.on { animation: stFocus 1s ease; }
   @keyframes stFocus { from { filter: blur(3px); opacity: .4; letter-spacing: 2px; } to { filter: blur(0); opacity: 1; letter-spacing: 0; } }
   body[data-st="frost"] .bar .rail { height: 4px; }
   body[data-st="frost"] .bar .played { background: linear-gradient(90deg, #2b7fb8, #7ec8ec); }
@@ -991,7 +991,7 @@
   }
   @keyframes stScanY { from { top: -22%; } to { top: 110%; } }
   body[data-st="holograma"] .now h1 { color: #aef3ff; text-shadow: 0 0 14px rgba(0,229,255,.7); }
-  body[data-st="holograma"] .lyrics .ly.on { animation: stGlitch 2.4s steps(1) infinite; }
+  body[data-st="holograma"][data-ly="minimal"] .lyrics .ly.on { animation: stGlitch 2.4s steps(1) infinite; }
   /* Aberración cromática del ejemplo, solo con el estilo de letras por defecto */
   body[data-st="holograma"][data-ly="minimal"] .lyrics .ly.on {
     text-shadow:
@@ -1051,7 +1051,7 @@
   }
   body[data-st="pop"] .vinyl::after { background: #171717; box-shadow: 0 0 0 3px #ffffff; }
   body[data-st="pop"] .now h1 { text-transform: uppercase; text-shadow: 3px 3px 0 rgba(23,23,23,.18); }
-  body[data-st="pop"] .lyrics .ly.on { animation: stPopIn .3s cubic-bezier(.2,1.6,.4,1); }
+  body[data-st="pop"][data-ly="minimal"] .lyrics .ly.on { animation: stPopIn .3s cubic-bezier(.2,1.6,.4,1); }
   /* Tarjeta cómic solo con el estilo de letras por defecto */
   body[data-st="pop"][data-ly="minimal"] .lyrics .ly.on {
     background: #ffffff; border: 2.5px solid #171717; border-radius: 10px;
@@ -1760,7 +1760,7 @@
     to { transform: translate(-24px, 300px) rotate(120deg); opacity: 0; }
   }
   body[data-st="sakura"] .now h1 { font-family: Georgia, "Times New Roman", serif; letter-spacing: 1px; }
-  body[data-st="sakura"] .lyrics .ly.on { animation: stFocus 1s ease; }
+  body[data-st="sakura"][data-ly="minimal"] .lyrics .ly.on { animation: stFocus 1s ease; }
   body[data-st="sakura"][data-ly="minimal"] .lyrics .ly { font-family: Georgia, "Times New Roman", serif; }
   body[data-st="sakura"][data-ly="minimal"] .lyrics .ly.on { font-style: italic; }
   body[data-st="sakura"] .bar .played { background: linear-gradient(90deg, #c04a5c, #e88b9a); }
@@ -2480,12 +2480,15 @@
     animation: lyWave 1s ease-in-out infinite;
     color: var(--accent); -webkit-text-fill-color: var(--accent); background: none;
   }
-  @keyframes lyWave { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  @keyframes lyWave {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(calc(-4px - var(--voice, 0) * 9px)); }
+  }
 
   /* 19. Láser */
   body[data-ly="laser"] .lyrics .ly.on .w.cur {
     border-bottom: 2px solid var(--accent);
-    box-shadow: 0 3px 12px var(--accent);
+    box-shadow: 0 calc(2px + var(--voice, 0) * 3px) calc(8px + var(--voice, 0) * 16px) var(--accent);
     color: var(--accent); -webkit-text-fill-color: var(--accent); background: none;
   }
 
@@ -2525,7 +2528,11 @@
   /* 24. Estrella */
   body[data-ly="estrella"] .lyrics .ly.on .w.cur {
     color: #fff; -webkit-text-fill-color: #fff;
-    text-shadow: 0 0 4px #fff, 0 0 10px #ffd700, 0 0 20px #ffd700, 0 0 40px #ff8c00;
+    text-shadow:
+      0 0 4px #fff,
+      0 0 calc(8px + var(--voice, 0) * 8px) #ffd700,
+      0 0 calc(18px + var(--voice, 0) * 18px) #ffd700,
+      0 0 calc(34px + var(--voice, 0) * 30px) #ff8c00;
     background: none;
   }
 
@@ -2536,8 +2543,17 @@
     background: none; animation: lyFlame .6s ease-in-out infinite alternate;
   }
   @keyframes lyFlame {
-    0% { text-shadow: 0 0 6px #ff5a1a, 0 0 18px #ff2a00; }
-    100% { text-shadow: 0 0 10px #ff9a3c, 0 0 28px #ff2a00, 0 -4px 30px #ffd27a; }
+    0% {
+      text-shadow:
+        0 0 calc(4px + var(--voice, 0) * 6px) #ff5a1a,
+        0 0 calc(12px + var(--voice, 0) * 14px) #ff2a00;
+    }
+    100% {
+      text-shadow:
+        0 0 calc(8px + var(--voice, 0) * 10px) #ff9a3c,
+        0 0 calc(20px + var(--voice, 0) * 20px) #ff2a00,
+        0 calc(-2px - var(--voice, 0) * 4px) calc(20px + var(--voice, 0) * 18px) #ffd27a;
+    }
   }
 
   /* 26. Sombra */
@@ -2571,8 +2587,12 @@
   body[data-ly="espacial"] .lyrics .ly { perspective: 400px; }
   body[data-ly="espacial"] .lyrics .ly.on .w.cur {
     color: #fff; -webkit-text-fill-color: #fff;
-    text-shadow: 0 0 5px #0ff, 0 0 15px #00f, 0 0 30px #00f;
-    background: none; transform: translateZ(10px) scale(1.08);
+    text-shadow:
+      0 0 calc(4px + var(--voice, 0) * 5px) #0ff,
+      0 0 calc(12px + var(--voice, 0) * 14px) #00f,
+      0 0 calc(26px + var(--voice, 0) * 24px) #00f;
+    background: none;
+    transform: translateZ(calc(6px + var(--voice, 0) * 16px)) scale(calc(1.05 + var(--voice, 0) * 0.05));
   }
 
   /* 31. Sonar */
@@ -2581,7 +2601,10 @@
     text-shadow: 0 0 4px #0ff, 0 0 12px #0ff;
     background: none; animation: lyRadar .5s ease-out infinite;
   }
-  @keyframes lyRadar { 0% { opacity: 1; } 100% { opacity: .6; } }
+  @keyframes lyRadar {
+    0% { opacity: 1; transform: scale(calc(1 + var(--voice, 0) * 0.03)); }
+    100% { opacity: calc(.85 - var(--voice, 0) * 0.25); transform: scale(1); }
+  }
 
   /* 32. Mosaico */
   body[data-ly="mosaico"] .lyrics .ly { font-family: "Cascadia Mono", Consolas, monospace; letter-spacing: 2px; }
@@ -2738,7 +2761,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.3</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.4</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -3896,14 +3919,20 @@
     const targetBass = bass / 6;
     smoothBass += (targetBass - smoothBass) * (targetBass > smoothBass ? 0.35 : 0.14);
     let targetVoice = voiceCnt ? (voiceSum / voiceCnt) : 0;
-    // Respaldo con las frases vocales analizadas del archivo si el grafo WebAudio aún no está activo
+    // Respaldo con las frases vocales analizadas del archivo si el grafo WebAudio
+    // aún no está activo. Se usa un pulso natural dentro de cada frase (sube y
+    // baja), NO `eff` (que ahora son segundos cantados, no un 0..1).
     if (targetVoice < 0.05 && !media.paused) {
       const tr = state.tracks[state.index];
       const phs = tr && tr.voiceData && tr.voiceData.phrases;
       const nowT = media.currentTime || 0;
       if (Array.isArray(phs)) {
         const ph = phs.find(p => nowT >= p.t - 0.08 && nowT <= p.end + 0.08);
-        if (ph) targetVoice = Math.min(1, Math.max(0.35, Number(ph.eff) || 0.65));
+        if (ph) {
+          const len = Math.max(0.2, ph.end - ph.t);
+          const k = Math.min(1, Math.max(0, (nowT - ph.t) / len));
+          targetVoice = 0.35 + 0.6 * Math.sin(Math.PI * k);   // 0.35 → 0.95 → 0.35
+        }
       }
     }
     smoothVoice += (targetVoice - smoothVoice) * (targetVoice > smoothVoice ? 0.45 : 0.18);
@@ -3979,6 +4008,10 @@
     // volver a analizar el audio solo para pintar el indicador.
     const sym = rawText.match(/\[sync:\s*(\d{1,3})\s*\]/i);
     if (sym) out.syncPct = Math.max(0, Math.min(100, Number(sym[1]) || 0));
+    // Motor que analizó la voz: 'rust' o 'js'. Permite re-analizar una sola vez
+    // al cambiar de motor (el análisis viejo no se reutiliza).
+    const em = rawText.match(/\[engine:\s*([a-z]+)\s*\]/i);
+    if (em) out.engine = String(em[1]).toLowerCase();
     if (lm && isFinite(+lm[1])) out.alignedDur = +lm[1];
     return out;
   }
@@ -4103,7 +4136,8 @@
       voiceAligned: d.voiceAligned, voiceRefined: d.voiceRefined, voiceSnap: d.voiceSnap,
       voiceWords: d.voiceWords, voiceShift: d.voiceShift,
       syncInfo: d.syncInfo, syncNA: d.syncNA,
-      fileSig: d.fileSig, alignedDur: d.alignedDur
+      fileSig: d.fileSig, alignedDur: d.alignedDur,
+      engine: d.engine          // 'rust' o 'js': qué motor analizó la voz
     };
     if (Array.isArray(d.lines) && d.lines.length) return { type: 'synced', lines: d.lines, source: d.source, ...extra };
     if (d.text && String(d.text).trim()) return { type: 'plain', text: String(d.text), source: d.source, ...extra };
@@ -4271,6 +4305,7 @@
                 if (lines.voiceWords) L.voiceWords = true;
                 if (lines.voiceRefined) { L.voiceRefined = true; L.voiceShift = lines.voiceShift; }
                 if (lines.alignedDur) L.alignedDur = lines.alignedDur;
+                if (lines.engine) L.engine = lines.engine;   // 'rust' o 'js'
                 // Resultado del analizador guardado en el propio .lrc: el
                 // indicador aparece al instante, sin volver a analizar el audio.
                 if (lines.syncPct != null) {
@@ -5154,6 +5189,7 @@
       voiceWords: !!L.voiceWords,
       alignedDur: L.alignedDur,
       syncInfo: L.syncInfo,
+      engine: L.engine,
       fileSig: fileSigOf(t, durSec(t))
     });
     // Guardar el .lrc con las marcas ya desplazadas.
@@ -5170,6 +5206,7 @@
           tags.push('[re:palabras-voz]');
           if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
         }
+        if (L.engine) tags.push('[engine:' + L.engine + ']');
         if (L.syncInfo && isFinite(+L.syncInfo.pct)) {
           tags.push('[sync:' + Math.round(+L.syncInfo.pct) + ']');
         }
@@ -5558,6 +5595,7 @@
       else if (L.voiceAligned) tags.push('[re:alineada-voz]');
       else if (L.voiceRefined) tags.push('[re:desfase-voz]');
       else if (L.voiceWords) tags.push('[re:palabras-voz]');
+      if (L.engine) tags.push('[engine:' + L.engine + ']');
       if (L.voiceRefined && isFinite(+L.voiceShift)) tags.push('[shift:' + L.voiceShift + ']');
       if (L.syncInfo && isFinite(+L.syncInfo.pct)) {
         tags.push('[sync:' + Math.round(+L.syncInfo.pct) + ']');
@@ -5898,12 +5936,16 @@
       return withWords.length >= Math.max(1, Math.floor(multi.length * 0.45));
     };
     // Si ya se analizó este mismo archivo, se midió la sincronía Y tiene palabras
-    // pegadas a la voz, no repetir.
+    // pegadas a la voz, no repetir. Pero si el análisis lo hizo OTRO motor
+    // ('js' vs 'rust'), se re-analiza UNA vez para aplicar las mejoras.
+    const hasRustEngine = !!(window.playerAPI && window.playerAPI.analyzeVoice);
+    const engineTag = hasRustEngine ? 'rust' : 'js';
+    const sameEngine = (L.engine || 'js') === engineTag;
     const curFileSig = fileSigOf(t, durSec(t));
     const durNow = durSec(t);
-    if ((L.syncInfo || L.syncNA) && hasVoiceWords(L) && curFileSig && L.fileSig === curFileSig) return;
+    if (sameEngine && (L.syncInfo || L.syncNA) && hasVoiceWords(L) && curFileSig && L.fileSig === curFileSig) return;
     // .lrc del disco ya medido y con marcas de palabra para esta misma duración: tampoco se repite.
-    if (L.syncInfo && hasVoiceWords(L) && isFinite(L.alignedDur) && durNow &&
+    if (sameEngine && L.syncInfo && hasVoiceWords(L) && isFinite(L.alignedDur) && durNow &&
         Math.abs(L.alignedDur - durNow) <= 2) {
       L.fileSig = curFileSig;
       return;
@@ -5918,15 +5960,27 @@
       try {
         // Si el usuario cambió de pista mientras esperaba, no gastar el análisis.
         if (state.tracks[state.index] !== t) { t._voiceSkipUntil = 0; return; }
-        const raw = await g.readAudio(fp);
-        if (!raw || !raw.byteLength) { t._voiceSkipUntil = Date.now() + 120000; return; }
-        const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
-        // Tope de tiempo: si el decodificado de un archivo problemático se atasca,
-        // no debe bloquear la cola ni el análisis de las canciones siguientes.
-        const A = await Promise.race([
-          analyzeVoice(bytes),
-          new Promise(res => setTimeout(() => res(null), 30000))
-        ]);
+        // Motor Rust (rápido, ~0.4 s por canción). Si no está disponible o falla,
+        // se usa el analizador JS de siempre (Web Audio).
+        let A = null;
+        let engineUsed = 'js';
+        try {
+          if (g.analyzeVoice) A = await g.analyzeVoice(fp);
+        } catch (e) { dbg('voz Rust: ' + (e && e.message || e)); }
+        if (A && Array.isArray(A.phrases) && A.phrases.length) {
+          engineUsed = 'rust';
+          dbg('voz: análisis con motor Rust');
+        } else {
+          const raw = await g.readAudio(fp);
+          if (!raw || !raw.byteLength) { t._voiceSkipUntil = Date.now() + 120000; return; }
+          const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+          // Tope de tiempo: si el decodificado de un archivo problemático se atasca,
+          // no debe bloquear la cola ni el análisis de las canciones siguientes.
+          A = await Promise.race([
+            analyzeVoice(bytes),
+            new Promise(res => setTimeout(() => res(null), 30000))
+          ]);
+        }
         if (!A) { t._voiceSkipUntil = Date.now() + 120000; dbg('análisis de voz: tiempo agotado'); return; }
         t.voiceData = A;
         if (!A || !A.phrases || !A.phrases.length) {
@@ -5943,14 +5997,16 @@
         // haber llegado otra versión (caché, .lrc, internet). Antes se descartaba.
         const cur = t.lyrics;
         if (!cur || cur.type === 'none' || cur.type === 'credits') return;
+        const prevEngine = cur.engine || 'js';
         const curFileSig2 = fileSigOf(t, durSec(t));
         // Letra ya pegada a la voz y con marcas por palabra para este mismo
         // audio: no se vuelve a tocar. Antes se salía aquí sin medir la
         // sincronía, y por eso las letras corregidas en versiones anteriores se
         // quedaban sin indicador. Ahora solo se salta la corrección, no la
         // medición: si falta el resultado, se calcula más abajo.
+        // Importante: solo se salta si el análisis lo hizo el MISMO motor.
         const yaPegada = (cur.voiceAligned || cur.voiceRefined || cur.voiceSnap || cur.voiceWords) &&
-          curFileSig2 && cur.fileSig === curFileSig2 && hasVoiceWords(cur);
+          curFileSig2 && cur.fileSig === curFileSig2 && hasVoiceWords(cur) && prevEngine === engineTag;
         if (yaPegada && (cur.syncInfo || cur.syncNA)) return;
         if (!yaPegada) {
           // Un LRC "aproximado" (tiempos repartidos por largo de línea) también se
@@ -5988,6 +6044,9 @@
         // Un LRC que ya traía marcas por palabra también cuenta como corregido:
         // no hay que volver a analizarlo en cada reproducción.
         if (cur.type === 'synced' && hasVoiceWords(cur)) cur.voiceWords = true;
+        // Marca del motor que hizo este análisis (permite re-analizar una sola vez
+        // al cambiar de motor, sin repetirlo en cada reproducción).
+        cur.engine = engineUsed;
 
         // ANALIZADOR AUTOMÁTICO: se mide la sincronía final (después de pegar la
         // letra a la voz, si hacía falta). El resultado solo informa: no mueve
@@ -6029,6 +6088,7 @@
               alignedDur: cur.alignedDur,
               syncInfo: cur.syncInfo,
               syncNA: !!cur.syncNA,
+              engine: cur.engine,
               fileSig: fileSigOf(t, durSec(t))
             });
           }
@@ -6045,6 +6105,7 @@
           alignedDur: cur.alignedDur,
           syncInfo: cur.syncInfo,
           syncNA: !!cur.syncNA,
+          engine: cur.engine,
           fileSig: fileSigOf(t, durSec(t))
         });
         // Guardar el LRC junto al audio con las etiquetas (palabras, desfase y
@@ -6869,7 +6930,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.3';
+  let APP_VERSION = '2.3.4';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
@@ -7069,6 +7130,23 @@
     savePlaylist();                     // guardado final al salir
     state.tracks.forEach(t => { if (t.url && t.url.startsWith('blob:')) URL.revokeObjectURL(t.url); });
   });
+  // Prueba temporal del motor Rust (se activa con ?testvoice en la URL)
+  if (location.search.includes('testvoice')) {
+    setTimeout(async () => {
+      try {
+        const tr = state.tracks[state.index];
+        const g = window.playerAPI;
+        if (!tr || !g || !g.analyzeVoice) { dbg('TEST Rust: sin API o sin pista'); return; }
+        const fp = tr.path || (g.getPathForFile && tr.file ? g.getPathForFile(tr.file) : null);
+        if (!fp) { dbg('TEST Rust: sin ruta'); return; }
+        const t0 = performance.now();
+        const A = await g.analyzeVoice(fp);
+        const ms = Math.round(performance.now() - t0);
+        dbg('TEST Rust: ' + (A ? (A.phrases.length + ' frases, ' + A.onsets.length + ' onsets') : 'null') + ' en ' + ms + ' ms');
+        toast(A ? ('Rust OK: ' + A.phrases.length + ' frases en ' + ms + ' ms') : 'Rust no disponible', 4000);
+      } catch (e) { dbg('TEST Rust error: ' + (e && e.message || e)); }
+    }, 2500);
+  }
 })();
 </script>
 </body>

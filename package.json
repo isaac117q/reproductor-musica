@@ -1,6 +1,6 @@
 {
   "name": "reproductor-musica",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "Reproductor de música para Windows",
   "main": "main.js",
   "scripts": {
@@ -31,6 +31,12 @@
       "preload.js",
       "index.html",
       "icon.ico"
+    ],
+    "extraResources": [
+      {
+        "from": "rust-voice/voice-analyzer.exe",
+        "to": "voice-analyzer.exe"
+      }
     ],
     "win": {
       "target": [

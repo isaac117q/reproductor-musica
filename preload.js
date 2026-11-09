@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('playerAPI', {
 
   // Audio de la pista actual (para alinear la letra con la voz, sin internet)
   readAudio: (p) => ipcRenderer.invoke('read-audio', p),
+  // Analizador de voz en Rust (rápido). Devuelve null si no está disponible.
+  analyzeVoice: (p) => ipcRenderer.invoke('analyze-voice-rust', p),
   // Guardar letra descargada como .lrc junto a la canción (funciona sin internet)
   saveLrc: (p, text) => ipcRenderer.invoke('save-lrc', p, text),
 

@@ -361,6 +361,46 @@ ipcMain.handle('read-audio', async (_e, p) => {
   } catch (e) { return null; }
 });
 
+// Analizador de voz en Rust (rápido). Devuelve { phrases, onsets, ... } o null.
+// Si el ejecutable no existe o falla, el renderizador usa el analizador JS de siempre.
+function voiceAnalyzerPath() {
+  const exe = process.platform === 'win32' ? 'voice-analyzer.exe' : 'voice-analyzer';
+  if (app.isPackaged) return path.join(process.resourcesPath, exe);
+  return path.join(__dirname, 'rust-voice', exe);
+}
+
+ipcMain.handle('analyze-voice-rust', async (_e, p) => {
+  try {
+    const file = String(p || '');
+    if (!file || !/\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|webm|mp4|m4v|mkv|mov)$/i.test(file)) return null;
+    const bin = voiceAnalyzerPath();
+    if (!fs.existsSync(bin)) return null;
+    const real = await fsp.realpath(file).catch(() => file);
+    return await new Promise((resolve) => {
+      let out = '';
+      let done = false;
+      let proc;
+      const finish = (v) => { if (!done) { done = true; resolve(v); } };
+      try {
+        proc = spawn(bin, [real], { windowsHide: true });
+      } catch (e) { return finish(null); }
+      const timer = setTimeout(() => { try { proc.kill(); } catch (e) {} finish(null); }, 60000);
+      proc.stdout.on('data', (d) => { out += d; });
+      proc.stderr.on('data', () => {});
+      proc.on('error', () => { clearTimeout(timer); finish(null); });
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        if (code !== 0) return finish(null);
+        try {
+          const j = JSON.parse(out);
+          if (!j || !Array.isArray(j.phrases) || !j.phrases.length) return finish(null);
+          finish(j);
+        } catch (e) { finish(null); }
+      });
+    });
+  } catch (e) { return null; }
+});
+
 ipcMain.handle('save-lrc', async (_e, p, text) => {
   try {
     if (!p || !text) return false;
@@ -675,6 +715,9 @@ app.whenReady().then(() => {
   // Borra restos de actualizaciones que ya no aplican (asar viejos, scripts).
   try { cleanupUpdatesDir(); } catch (e) { /* no bloquear el arranque */ }
   createWindow();
+  // Si la instalación no trae el analizador de voz (p. ej. actualización ligera
+  // desde una versión sin Rust), se descarga solo una vez en segundo plano.
+  setTimeout(() => { ensureVoiceAnalyzer().catch(() => {}); }, 5000);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -710,6 +753,7 @@ function clearPendingUpdate() {
   try {
     const p = readPendingUpdate();
     if (p && p.file) { try { fs.unlinkSync(p.file); } catch (e) { /* ya no existe */ } }
+    if (p && p.exeFile) { try { fs.unlinkSync(p.exeFile); } catch (e) { /* ya no existe */ } }
   } catch (e) { /* pending ilegible */ }
   try { fs.unlinkSync(pendingUpdateFile()); } catch (e) { /* ya no existe */ }
 }
@@ -726,7 +770,7 @@ function cleanupUpdatesDir() {
   try { fs.unlinkSync(pendingUpdateFile()); } catch (e) { /* no existe */ }
   try {
     for (const f of fs.readdirSync(updatesDir())) {
-      if (/^app-.*\.asar$/i.test(f) || f === 'apply-update.ps1') {
+      if (/^app-.*\.asar$/i.test(f) || /^voice-analyzer-.*\.exe$/i.test(f) || f === 'apply-update.ps1') {
         try { fs.unlinkSync(path.join(updatesDir(), f)); } catch (e) { /* en uso */ }
       }
     }
@@ -744,10 +788,13 @@ async function fetchLightUpdateInfo() {
   return j;
 }
 
-// Descarga app.asar con progreso (el botón "Actualizar" muestra el porcentaje).
+// Descarga app.asar (y el .exe del analizador de voz, si la release lo incluye)
+// con progreso (el botón "Actualizar" muestra el porcentaje).
 async function downloadLightUpdate(info) {
   const win = mainWindow || BrowserWindow.getAllWindows()[0];
   const send = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); };
+  const hasExe = !!(info && info.exe && info.exe.sha256);
+  const asarMax = hasExe ? 88 : 100;
   const res = await fetch(APP_UPDATE_ASAR_URL + '?t=' + Date.now(), {
     headers: { 'User-Agent': 'reproductor-musica', 'Cache-Control': 'no-cache' },
     cache: 'no-store'
@@ -764,7 +811,7 @@ async function downloadLightUpdate(info) {
       const chunk = Buffer.from(step.value);
       chunks.push(chunk);
       received += chunk.length;
-      const pct = total ? Math.min(100, Math.round(received * 100 / total)) : 50;
+      const pct = total ? Math.min(asarMax, Math.round(received * asarMax / total)) : 50;
       if (pct !== lastPct) {
         lastPct = pct;
         send('update-progress', { percent: pct, transferred: received, total });
@@ -774,7 +821,7 @@ async function downloadLightUpdate(info) {
     const buf = Buffer.from(await res.arrayBuffer());
     chunks.push(buf);
     received = buf.length;
-    send('update-progress', { percent: 100, transferred: received, total });
+    send('update-progress', { percent: asarMax, transferred: received, total });
   }
   const buf = Buffer.concat(chunks);
   if (info.size && buf.length !== Number(info.size)) {
@@ -786,12 +833,56 @@ async function downloadLightUpdate(info) {
   }
   const dir = updatesDir();
   await fsp.mkdir(dir, { recursive: true });
-  const file = path.join(dir, 'app-' + String(info.version).replace(/[^\w.-]/g, '') + '.asar');
+  const ver = String(info.version).replace(/[^\w.-]/g, '');
+  const file = path.join(dir, 'app-' + ver + '.asar');
   await fsp.writeFile(file, buf);
+
+  // `.exe` del analizador de voz (Rust). Si no se puede descargar, se ignora:
+  // la app seguirá usando el analizador JS como respaldo.
+  let exeFile = null, exeSha = null;
+  if (hasExe) {
+    send('update-progress', { percent: 91, total, transferred: total });
+    const exeName = String(info.exe.file || 'voice-analyzer.exe').replace(/[^\w.-]/g, '');
+    const exeDest = path.join(dir, 'voice-analyzer-' + ver + '.exe');
+    if (fs.existsSync(exeDest)) {
+      try {
+        const old = await fsp.readFile(exeDest);
+        const oldSha = crypto.createHash('sha256').update(old).digest('hex');
+        if (oldSha.toLowerCase() === String(info.exe.sha256).toLowerCase()) {
+          exeFile = exeDest; exeSha = oldSha;
+        }
+      } catch (e) { /* se vuelve a descargar */ }
+    }
+    if (!exeFile) {
+      try {
+        const er = await fetch('https://github.com/isaac117q/reproductor-musica/releases/latest/download/' +
+          encodeURIComponent(exeName) + '?t=' + Date.now(), {
+          headers: { 'User-Agent': 'reproductor-musica', 'Cache-Control': 'no-cache' },
+          cache: 'no-store'
+        });
+        if (er.ok) {
+          const ebuf = Buffer.from(await er.arrayBuffer());
+          if (!info.exe.size || ebuf.length === Number(info.exe.size)) {
+            const esha = crypto.createHash('sha256').update(ebuf).digest('hex');
+            if (esha.toLowerCase() === String(info.exe.sha256).toLowerCase()) {
+              await fsp.writeFile(exeDest, ebuf);
+              exeFile = exeDest; exeSha = esha;
+            }
+          }
+        }
+      } catch (e) {
+        await appendDebug('actualización: no se pudo descargar el analizador: ' + (e && e.message || e));
+      }
+    }
+    send('update-progress', { percent: 100, total, transferred: total });
+  }
+
   await fsp.writeFile(pendingUpdateFile(), JSON.stringify({
-    version: info.version, file, sha256, size: buf.length
+    version: info.version, file, sha256, size: buf.length,
+    exeFile, exeSha
   }));
-  await appendDebug('actualización ligera descargada: v' + info.version + ' (' + buf.length + ' bytes)');
+  await appendDebug('actualización ligera descargada: v' + info.version + ' (' + buf.length + ' bytes)' +
+    (exeFile ? ' + analizador ' + (fs.existsSync(exeFile) ? fs.statSync(exeFile).size : 0) + ' bytes' : ''));
   send('update-downloaded', info.version);
   return { ok: true, version: info.version, size: buf.length };
 }
@@ -799,6 +890,46 @@ async function downloadLightUpdate(info) {
 function appAsarPath() {
   if (!app.isPackaged) return null;
   return path.join(path.dirname(process.execPath), 'resources', 'app.asar');
+}
+
+// Auto-reparación del analizador de voz: si falta en resources (por ejemplo,
+// tras una actualización ligera desde una versión anterior sin Rust), descarga
+// el .exe publicado en la última release y lo deja junto a app.asar.
+let ensuredVoiceAnalyzer = false;
+async function ensureVoiceAnalyzer() {
+  if (!app.isPackaged || ensuredVoiceAnalyzer) return;
+  ensuredVoiceAnalyzer = true;
+  const exeName = process.platform === 'win32' ? 'voice-analyzer.exe' : 'voice-analyzer';
+  const dest = path.join(process.resourcesPath, exeName);
+  try {
+    const info = await fetchLightUpdateInfo();
+    if (!info || !info.exe || !info.exe.sha256) return;
+    const want = String(info.exe.sha256).toLowerCase();
+    if (fs.existsSync(dest)) {
+      const cur = await fsp.readFile(dest);
+      const sha = crypto.createHash('sha256').update(cur).digest('hex');
+      if (sha.toLowerCase() === want) return;
+    }
+    const url = 'https://github.com/isaac117q/reproductor-musica/releases/latest/download/' +
+      encodeURIComponent(String(info.exe.file || exeName));
+    const r = await fetch(url + '?t=' + Date.now(), {
+      headers: { 'User-Agent': 'reproductor-musica', 'Cache-Control': 'no-cache' },
+      cache: 'no-store'
+    });
+    if (!r.ok) { await appendDebug('motor de voz: HTTP ' + r.status); return; }
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (info.exe.size && buf.length !== Number(info.exe.size)) {
+      await appendDebug('motor de voz: tamaño inesperado'); return;
+    }
+    const sha = crypto.createHash('sha256').update(buf).digest('hex');
+    if (sha.toLowerCase() !== want) { await appendDebug('motor de voz: sha no coincide'); return; }
+    const tmp = dest + '.tmp';
+    await fsp.writeFile(tmp, buf);
+    await fsp.rename(tmp, dest).catch(async () => { await fsp.writeFile(dest, buf); try { await fsp.unlink(tmp); } catch (e) {} });
+    await appendDebug('motor de voz descargado: ' + exeName + ' (' + buf.length + ' bytes)');
+  } catch (e) {
+    await appendDebug('motor de voz: ' + (e && e.message || e));
+  }
 }
 
 // Al cerrar la app: un script oculto espera a que termine el proceso y
@@ -821,6 +952,9 @@ function scheduleApplyUpdateOnQuit(relanzar) {
   const taskName = 'ReproductorMusicaUpdate_' + process.pid;
   const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
   const ver = String(p.version).replace(/[^\w.-]/g, '');
+  const exeName = process.platform === 'win32' ? 'voice-analyzer.exe' : 'voice-analyzer';
+  const exeTarget = path.join(path.dirname(process.execPath), 'resources', exeName);
+  const hasExe = !!(p.exeFile && fs.existsSync(p.exeFile));
   const ps = [
     "$ErrorActionPreference = 'SilentlyContinue'",
     // Esperar a que la app termine de verdad (el usuario puede tardar en cerrar).
@@ -837,6 +971,13 @@ function scheduleApplyUpdateOnQuit(relanzar) {
     '}',
     'if ($ok) {',
     '  Remove-Item -LiteralPath ' + q(p.file) + ' -Force',
+    hasExe ? '  $okExe = $false' : '',
+    hasExe ? '  for ($j = 0; $j -lt 30; $j++) {' : '',
+    hasExe ? '    Copy-Item -LiteralPath ' + q(p.exeFile) + ' -Destination ' + q(exeTarget) + ' -Force' : '',
+    hasExe ? '    if ($?) { $okExe = $true; break }' : '',
+    hasExe ? '    Start-Sleep -Milliseconds 300' : '',
+    hasExe ? '  }' : '',
+    hasExe ? '  if ($okExe) { Remove-Item -LiteralPath ' + q(p.exeFile) + ' -Force }' : '',
     '  Remove-Item -LiteralPath ' + q(pendingUpdateFile()) + ' -Force',
     "  Add-Content -LiteralPath " + q(log) + " -Value ('OK ' + (Get-Date -Format s) + ' v" + ver + "')",
     '} else {',
