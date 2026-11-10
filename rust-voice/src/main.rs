@@ -269,6 +269,13 @@ fn main() {
     // ---- 3) Suavizado adaptativo por canción ----
     // Se estima el ritmo de ataques (IOI = intervalo entre picos de flux) y se
     // ajusta la ventana de suavizado de la envolvente.
+    if env::var("RMS_DUMP").is_ok() {
+        let fs_ = hop as f32 / sr as f32;
+        for f in 0..n {
+            println!("{:.3},{:.5},{:.3}", f as f32 * fs_, rms[f], hnr[f]);
+        }
+        return;
+    }
     let flux_sorted = sorted_copy(&flux);
     let f90 = percentile(&flux_sorted, 0.90);
     let mut peaks: Vec<usize> = Vec::new();

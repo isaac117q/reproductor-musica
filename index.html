@@ -2761,7 +2761,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.5</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.6</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -5789,19 +5789,25 @@
       const nextRaw = i + 1 < L.lines.length ? +L.lines[i + 1].t : start + 8;
       if (!(nextRaw > start + 0.3)) continue;
       let end = Math.min(nextRaw, start + 10);
-      // Frase vocal que contiene el inicio de la línea (las frases pueden
-      // agrupar varias líneas: nunca se pasa del inicio de la siguiente).
-      let ph = null, bestD = 1.1;
+      // Fin de la línea = hasta donde hay VOZ dentro de [start, nextRaw], usando
+      // TODAS las frases que caen en ese tramo (no solo la primera). Antes se
+      // recortaba a la primera frase que contenía el inicio; con frases cortas
+      // (motor Rust) eso comprimía 11 palabras en ~1 s y el resaltado terminaba
+      // mucho antes de que el cantante acabara la línea.
+      let voiceEnd = start;
       for (let k = 0; k < phrases.length; k++) {
         const p = phrases[k];
-        if (start < p.t - 1.0 || start > p.end + 0.2) continue;
-        const d = Math.abs(p.t - start);
-        if (d < bestD) { bestD = d; ph = p; }
+        if (p.end <= start + 0.05) continue;
+        if (p.t >= end) break;
+        voiceEnd = Math.max(voiceEnd, Math.min(p.end, end));
       }
-      if (ph) end = Math.min(end, Math.max(start + 0.4, ph.end + 0.25));
-      // Sin frase detectada (ad-lib, intro hablado…): el tramo se limita a lo que
-      // tarda en cantarse el texto, para no repartir palabras por un silencio.
-      else end = Math.min(end, start + Math.max(1.2, Math.min(6, String(line.text || '').length * 0.12)));
+      if (voiceEnd > start + 0.35) {
+        end = Math.min(end, voiceEnd + 0.25);
+      } else {
+        // Sin voz detectada (ad-lib, intro hablado…): se limita a lo que tarda
+        // en cantarse el texto, para no repartir palabras por un silencio.
+        end = Math.min(end, start + Math.max(1.2, Math.min(6, String(line.text || '').length * 0.12)));
+      }
       if (!(end > start + 0.35)) continue;
       // Primero se intenta anclar cada palabra a un ataque real; si la línea es
       // corta o hay pocos ataques, se reparte por sílabas dentro de la frase
@@ -5949,7 +5955,9 @@
     // pegadas a la voz, no repetir. Pero si el análisis lo hizo OTRO motor
     // ('js' vs 'rust'), se re-analiza UNA vez para aplicar las mejoras.
     const hasRustEngine = !!(window.playerAPI && window.playerAPI.analyzeVoice);
-    const engineTag = hasRustEngine ? 'rust' : 'js';
+    // 'rust2' invalida una vez los análisis de 'rust' antiguos: cambia el criterio
+    // de reparto de palabras (frases completas) y hay que recalcularlos.
+    const engineTag = hasRustEngine ? 'rust2' : 'js';
     const sameEngine = (L.engine || 'js') === engineTag;
     const curFileSig = fileSigOf(t, durSec(t));
     const durNow = durSec(t);
@@ -5978,7 +5986,7 @@
           if (g.analyzeVoice) A = await g.analyzeVoice(fp);
         } catch (e) { dbg('voz Rust: ' + (e && e.message || e)); }
         if (A && Array.isArray(A.phrases) && A.phrases.length) {
-          engineUsed = 'rust';
+          engineUsed = 'rust2';
           dbg('voz: análisis con motor Rust');
         } else {
           const raw = await g.readAudio(fp);
@@ -6008,6 +6016,17 @@
         const cur = t.lyrics;
         if (!cur || cur.type === 'none' || cur.type === 'credits') return;
         const prevEngine = cur.engine || 'js';
+        // Al cambiar de motor se descartan las marcas de palabra antiguas para
+        // recalcularlas con el criterio nuevo (frases completas, no la primera).
+        if (prevEngine !== engineTag) {
+          for (const ln of (cur.lines || [])) {
+            if (!ln) continue;
+            try { delete ln.words; delete ln.end; } catch (e) { }
+          }
+          cur.voiceWords = false;
+          cur.syncInfo = null;
+          cur.syncNA = false;
+        }
         const curFileSig2 = fileSigOf(t, durSec(t));
         // Letra ya pegada a la voz y con marcas por palabra para este mismo
         // audio: no se vuelve a tocar. Antes se salía aquí sin medir la
@@ -6944,7 +6963,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.5';
+  let APP_VERSION = '2.3.6';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
