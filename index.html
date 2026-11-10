@@ -2761,7 +2761,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.9</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.4.0</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -5951,6 +5951,49 @@
   }
 
   // Veredicto cuando solo se conoce el porcentaje guardado en el .lrc.
+  // Desplaza todas las líneas (y palabras) de una letra en `sh` segundos.
+  function shiftLyricTimes(L, sh) {
+    if (!L || !Array.isArray(L.lines) || !sh) return;
+    L.lines = L.lines.map(ln => {
+      const o = Object.assign({}, ln, { t: Math.max(0, (+ln.t) + sh) });
+      if (isFinite(+ln.end)) o.end = Math.max(o.t + 0.1, (+ln.end) + sh);
+      if (Array.isArray(ln.words)) {
+        o.words = ln.words.map(w => {
+          const nw = Object.assign({}, w, { t: Math.max(0, (+w.t) + sh) });
+          if (isFinite(+w.end)) nw.end = Math.max(0, (+w.end) + sh);
+          return nw;
+        });
+      }
+      return o;
+    });
+  }
+
+  // Busca el desplazamiento global (dentro de ±maxShift) que hace que más
+  // líneas caigan sobre frases vocales. Sirve para letras con desfase constante.
+  function bestGlobalShift(L, A, maxShift, step) {
+    const phrases = (Array.isArray(A && A.phrases) ? A.phrases : [])
+      .filter(p => p && isFinite(p.t) && isFinite(p.end) && p.end > p.t);
+    const times = (L && Array.isArray(L.lines) ? L.lines : [])
+      .map(l => +l.t).filter(t => isFinite(t) && t >= 0);
+    if (phrases.length < 4 || times.length < 5) return null;
+    const hitsAt = (s) => {
+      let h = 0;
+      for (const t of times) {
+        const x = t + s;
+        if (x < 0) continue;
+        if (phrases.some(p => x >= p.t - 0.5 && x <= p.end + 0.5)) h++;
+      }
+      return h;
+    };
+    const baseHits = hitsAt(0);
+    let best = { shift: 0, hits: baseHits };
+    for (let s = -maxShift; s <= maxShift + 1e-9; s += step) {
+      const h = hitsAt(s);
+      if (h > best.hits) best = { shift: Math.round(s * 100) / 100, hits: h };
+    }
+    return { shift: best.shift, hits: best.hits, baseHits, total: times.length };
+  }
+
   function syncVerdictFromPct(pct, offset) {
     const p = Number(pct) || 0;
     const ad = Math.abs(Number(offset) || 0);
@@ -6096,15 +6139,61 @@
         // ANALIZADOR AUTOMÁTICO: se mide la sincronía final (después de pegar la
         // letra a la voz, si hacía falta). El resultado solo informa: no mueve
         // ninguna línea. Se guarda con la letra para no reanalizar el audio.
-        const info = voiceSyncInfo(cur, A, durSec(t));
+        let info = voiceSyncInfo(cur, A, durSec(t));
+        // Si no llega al 90 %, busca el desfase global que mejor encaja y
+        // vuelve a medir. Se queda con el mejor resultado (o revierte).
+        if (info && info.pct < 90) {
+          const bs = bestGlobalShift(cur, A, 3, 0.1);
+          if (bs && Math.abs(bs.shift) >= 0.3 && bs.hits > bs.baseHits + 1) {
+            shiftLyricTimes(cur, bs.shift);
+            const info2 = voiceSyncInfo(cur, A, durSec(t));
+            if (info2 && info2.pct > info.pct) {
+              info = info2;
+              cur.voiceRefined = true;
+              cur.voiceShift = Math.round(((+cur.voiceShift || 0) + bs.shift) * 100) / 100;
+              dbg('voz: desfase global ' + (bs.shift > 0 ? '+' : '') + bs.shift.toFixed(1) +
+                  's → sincronía ' + info.pct + '%');
+            } else {
+              shiftLyricTimes(cur, -bs.shift);   // no mejora: se revierte
+            }
+          }
+        }
+        // Si aún no llega al 90 %, prueba a re-alinear las líneas a las frases
+        // de voz (texto → voz). Si mejora, se queda; si no, se revierte.
+        if (info && info.pct < 90 && cur.type === 'synced' && !cur.estimated) {
+          const backup = cur.lines.map(l => JSON.parse(JSON.stringify(l)));
+          const est0 = cur.estimated, va0 = cur.voiceAligned, vw0 = cur.voiceWords;
+          try {
+            cur.estimated = true;
+            cur.voiceAligned = false;
+            cur.voiceWords = false;
+            alignPlainToVoice(t, A);
+            const info3 = voiceSyncInfo(cur, A, durSec(t));
+            if (info3 && info3.pct > info.pct) {
+              info = info3;
+              cur.estimated = true;
+              dbg('voz: re-alineada a la voz → sincronía ' + info.pct + '%');
+            } else {
+              cur.lines = backup;
+              cur.estimated = est0;
+              cur.voiceAligned = va0;
+              cur.voiceWords = vw0;
+            }
+          } catch (e) {
+            cur.lines = backup;
+            cur.estimated = est0;
+            cur.voiceAligned = va0;
+            cur.voiceWords = vw0;
+          }
+        }
         if (info) {
           // Si la letra se ajustó desde texto simple, el mismo análisis que la
           // colocó no puede darla por verificada: se guarda como advertencia.
           if (cur.voiceAligned || cur.estimated) info.verdict = 'warn';
           cur.syncInfo = info;
           cur.syncNA = false;
-          // Al 98-100 % se marca como verificada: no se vuelve a mover.
-          cur.verified = !!(info.pct >= 98 && !cur.estimated && !cur.voiceAligned);
+          // Al 90-100 % se marca como verificada: no se vuelve a mover.
+          cur.verified = !!(info.pct >= 90 && !cur.estimated && !cur.voiceAligned);
         } else if (cur.type === 'synced') {
           // No hubo datos suficientes (pocas frases vocales): se marca para que
           // el indicador muestre "sin datos" en vez de no aparecer.
@@ -6995,7 +7084,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.9';
+  let APP_VERSION = '2.4.0';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
