@@ -2761,7 +2761,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.4.1</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.4.2</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -6136,56 +6136,10 @@
         // al cambiar de motor, sin repetirlo en cada reproducción).
         cur.engine = engineUsed;
 
-        // ANALIZADOR AUTOMÁTICO: se mide la sincronía final (después de pegar la
-        // letra a la voz, si hacía falta). El resultado solo informa: no mueve
-        // ninguna línea. Se guarda con la letra para no reanalizar el audio.
-        let info = voiceSyncInfo(cur, A, durSec(t));
-        // Si no llega al 90 %, busca el desfase global que mejor encaja y
-        // vuelve a medir. Se queda con el mejor resultado (o revierte).
-        if (info && info.pct < 90) {
-          const bs = bestGlobalShift(cur, A, 3, 0.1);
-          if (bs && Math.abs(bs.shift) >= 0.3 && bs.hits > bs.baseHits + 1) {
-            shiftLyricTimes(cur, bs.shift);
-            const info2 = voiceSyncInfo(cur, A, durSec(t));
-            if (info2 && info2.pct > info.pct) {
-              info = info2;
-              cur.voiceRefined = true;
-              cur.voiceShift = Math.round(((+cur.voiceShift || 0) + bs.shift) * 100) / 100;
-              dbg('voz: desfase global ' + (bs.shift > 0 ? '+' : '') + bs.shift.toFixed(1) +
-                  's → sincronía ' + info.pct + '%');
-            } else {
-              shiftLyricTimes(cur, -bs.shift);   // no mejora: se revierte
-            }
-          }
-        }
-        // Si aún no llega al 90 %, prueba a re-alinear las líneas a las frases
-        // de voz (texto → voz). Si mejora, se queda; si no, se revierte.
-        if (info && info.pct < 90 && cur.type === 'synced' && !cur.estimated) {
-          const backup = cur.lines.map(l => JSON.parse(JSON.stringify(l)));
-          const est0 = cur.estimated, va0 = cur.voiceAligned, vw0 = cur.voiceWords;
-          try {
-            cur.estimated = true;
-            cur.voiceAligned = false;
-            cur.voiceWords = false;
-            alignPlainToVoice(t, A);
-            const info3 = voiceSyncInfo(cur, A, durSec(t));
-            if (info3 && info3.pct > info.pct) {
-              info = info3;
-              cur.estimated = true;
-              dbg('voz: re-alineada a la voz → sincronía ' + info.pct + '%');
-            } else {
-              cur.lines = backup;
-              cur.estimated = est0;
-              cur.voiceAligned = va0;
-              cur.voiceWords = vw0;
-            }
-          } catch (e) {
-            cur.lines = backup;
-            cur.estimated = est0;
-            cur.voiceAligned = va0;
-            cur.voiceWords = vw0;
-          }
-        }
+        // ANALIZADOR AUTOMÁTICO: se mide la sincronía final. Solo informa: NO
+        // mueve líneas (las correcciones automáticas de desfase/re-alineado se
+        // retiraron porque podían desincronizar letras que ya estaban bien).
+        const info = voiceSyncInfo(cur, A, durSec(t));
         if (info) {
           // Si la letra se ajustó desde texto simple, el mismo análisis que la
           // colocó no puede darla por verificada: se guarda como advertencia.
@@ -6500,11 +6454,8 @@
     });
   }
 
-  let voiceNowActive = true;
   function paintWords(el, lines, idx, now) {
     if (!el || idx < 0) return;
-    // Sin voz no se avanza el resaltado: se espera a que el cantante llegue.
-    if (!voiceNowActive) return;
     const line = lines[idx];
     if (!line) return;
     const nextT = lines[idx + 1] ? +lines[idx + 1].t : 0;
@@ -6577,33 +6528,6 @@
       if (lines[mid].t <= now + .05) { idx = mid; lo = mid + 1; }
       else hi = mid - 1;
     }
-    // Esperar a la voz: si el instante actual no cae en una frase vocal (intro
-    // instrumental, pausa, etc.), NO se activa ninguna línea nueva. Antes se
-    // forzaba idx=0 desde el segundo 0 y la primera línea se resaltaba durante
-    // toda la intro, mucho antes de que el cantante empezara.
-    let voiceActive = true;
-    const VA = t.voiceData;
-    if (VA && Array.isArray(VA.phrases) && VA.phrases.length >= 3) {
-      let inPhrase = false;
-      let prevEnd = -Infinity, nextStart = Infinity;
-      for (const p of VA.phrases) {
-        if (now >= p.t - 0.25 && now <= p.end + 0.40) { inPhrase = true; break; }
-        if (p.end < now) { if (p.end > prevEnd) prevEnd = p.end; }
-        else if (p.t > now) { if (p.t < nextStart) nextStart = p.t; }
-      }
-      if (inPhrase) {
-        voiceActive = true;
-      } else {
-        const a = isFinite(prevEnd) ? prevEnd : now - 99;
-        const b = isFinite(nextStart) ? nextStart : now + 99;
-        // Hueco corto (respiración) → sigue; hueco largo (instrumental) → espera.
-        voiceActive = (b - a) <= 1.5;
-      }
-    }
-    if (!force && !voiceActive && state.lastLyricIdx >= 0 && idx > state.lastLyricIdx) {
-      idx = state.lastLyricIdx;   // no adelantar: esperar a que el cantante llegue
-    }
-    voiceNowActive = voiceActive;
     const box = $('lyricsBox');
     const el = idx >= 0 ? box.querySelector(`.ly[data-i="${idx}"]`) : null;
     // Si la frase ya terminó y queda un instrumental largo antes de la línea
@@ -7111,7 +7035,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.4.1';
+  let APP_VERSION = '2.4.2';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
