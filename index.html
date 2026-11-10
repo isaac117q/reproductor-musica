@@ -2761,7 +2761,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.8</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.9</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -4012,6 +4012,8 @@
     // al cambiar de motor (el análisis viejo no se reutiliza).
     const em = rawText.match(/\[engine:\s*([a-z]+)\s*\]/i);
     if (em) out.engine = String(em[1]).toLowerCase();
+    // Marca de sincronía verificada al 100 %: no se vuelve a tocar.
+    out.verified = /\[verified:\s*1\]/i.test(rawText);
     if (lm && isFinite(+lm[1])) out.alignedDur = +lm[1];
     return out;
   }
@@ -4137,7 +4139,8 @@
       voiceWords: d.voiceWords, voiceShift: d.voiceShift,
       syncInfo: d.syncInfo, syncNA: d.syncNA,
       fileSig: d.fileSig, alignedDur: d.alignedDur,
-      engine: d.engine          // 'rust' o 'js': qué motor analizó la voz
+      engine: d.engine,          // 'rust' o 'js': qué motor analizó la voz
+      verified: d.verified       // true = sincronía al 100 %, no volver a mover
     };
     if (Array.isArray(d.lines) && d.lines.length) return { type: 'synced', lines: d.lines, source: d.source, ...extra };
     if (d.text && String(d.text).trim()) return { type: 'plain', text: String(d.text), source: d.source, ...extra };
@@ -4306,6 +4309,7 @@
                 if (lines.voiceRefined) { L.voiceRefined = true; L.voiceShift = lines.voiceShift; }
                 if (lines.alignedDur) L.alignedDur = lines.alignedDur;
                 if (lines.engine) L.engine = lines.engine;   // 'rust' o 'js'
+                if (lines.verified) L.verified = true;      // ya al 100 %, no tocar
                 // Resultado del analizador guardado en el propio .lrc: el
                 // indicador aparece al instante, sin volver a analizar el audio.
                 if (lines.syncPct != null) {
@@ -5197,6 +5201,7 @@
       alignedDur: L.alignedDur,
       syncInfo: L.syncInfo,
       engine: L.engine,
+      verified: L.verified,
       fileSig: fileSigOf(t, durSec(t))
     });
     // Guardar el .lrc con las marcas ya desplazadas.
@@ -5214,6 +5219,7 @@
           if (durSec(t)) tags.push('[length:' + Math.round(durSec(t)) + ']');
         }
         if (L.engine) tags.push('[engine:' + L.engine + ']');
+      if (L.verified) tags.push('[verified:1]');
         if (L.syncInfo && isFinite(+L.syncInfo.pct)) {
           tags.push('[sync:' + Math.round(+L.syncInfo.pct) + ']');
         }
@@ -5603,6 +5609,7 @@
       else if (L.voiceRefined) tags.push('[re:desfase-voz]');
       else if (L.voiceWords) tags.push('[re:palabras-voz]');
       if (L.engine) tags.push('[engine:' + L.engine + ']');
+      if (L.verified) tags.push('[verified:1]');
       if (L.voiceRefined && isFinite(+L.voiceShift)) tags.push('[shift:' + L.voiceShift + ']');
       if (L.syncInfo && isFinite(+L.syncInfo.pct)) {
         tags.push('[sync:' + Math.round(+L.syncInfo.pct) + ']');
@@ -5964,28 +5971,24 @@
       const withWords = multi.filter(l => Array.isArray(l.words) && l.words.length > 1);
       return withWords.length >= Math.max(1, Math.floor(multi.length * 0.45));
     };
-    // Si ya se analizó este mismo archivo, se midió la sincronía Y tiene palabras
-    // pegadas a la voz, no repetir. Pero si el análisis lo hizo OTRO motor
-    // ('js' vs 'rust'), se re-analiza UNA vez para aplicar las mejoras.
+    // Motor que analiza: 'rust2' (Rust) o 'js'. Un análisis de otro motor se
+    // recalcula una vez.
     const hasRustEngine = !!(window.playerAPI && window.playerAPI.analyzeVoice);
-    // 'rust2' invalida una vez los análisis de 'rust' antiguos: cambia el criterio
-    // de reparto de palabras (frases completas) y hay que recalcularlos.
     const engineTag = hasRustEngine ? 'rust2' : 'js';
     const sameEngine = (L.engine || 'js') === engineTag;
-    const curFileSig = fileSigOf(t, durSec(t));
-    const durNow = durSec(t);
-    if (sameEngine && (L.syncInfo || L.syncNA) && hasVoiceWords(L) && curFileSig && L.fileSig === curFileSig) return;
-    // .lrc del disco ya medido y con marcas de palabra para esta misma duración: tampoco se repite.
-    if (sameEngine && L.syncInfo && hasVoiceWords(L) && isFinite(L.alignedDur) && durNow &&
-        Math.abs(L.alignedDur - durNow) <= 2) {
-      L.fileSig = curFileSig;
-      return;
-    }
+    // Sincronía ya verificada al 100 %: se deja tal cual, no se vuelve a mover.
+    // Si NO está verificada, se analiza automáticamente al menos una vez por
+    // sesión, aunque ya exista un análisis anterior (el usuario lo pidió así).
+    const verified = !!L.verified ||
+      (!!L.syncInfo && isFinite(+L.syncInfo.pct) && +L.syncInfo.pct >= 98);
+    if (sameEngine && verified) return;
+    if (t._voiceAutoTried) return;
     if (t._voiceBusy || Date.now() < (t._voiceSkipUntil || 0)) return;
     const g = window.playerAPI;
     if (!g || !g.readAudio) return;
     const fp = t.path || (g.getPathForFile && t.file ? g.getPathForFile(t.file) : null);
     if (!fp) return;
+    t._voiceAutoTried = true;
     t._voiceBusy = true;
     const job = async () => {
       try {
@@ -6100,6 +6103,8 @@
           if (cur.voiceAligned || cur.estimated) info.verdict = 'warn';
           cur.syncInfo = info;
           cur.syncNA = false;
+          // Al 98-100 % se marca como verificada: no se vuelve a mover.
+          cur.verified = !!(info.pct >= 98 && !cur.estimated && !cur.voiceAligned);
         } else if (cur.type === 'synced') {
           // No hubo datos suficientes (pocas frases vocales): se marca para que
           // el indicador muestre "sin datos" en vez de no aparecer.
@@ -6131,6 +6136,7 @@
               syncInfo: cur.syncInfo,
               syncNA: !!cur.syncNA,
               engine: cur.engine,
+              verified: !!cur.verified,
               fileSig: fileSigOf(t, durSec(t))
             });
           }
@@ -6148,6 +6154,7 @@
           syncInfo: cur.syncInfo,
           syncNA: !!cur.syncNA,
           engine: cur.engine,
+          verified: !!cur.verified,
           fileSig: fileSigOf(t, durSec(t))
         });
         // Guardar el LRC junto al audio con las etiquetas (palabras, desfase y
@@ -6988,7 +6995,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.8';
+  let APP_VERSION = '2.3.9';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
