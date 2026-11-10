@@ -2761,7 +2761,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.7</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.8</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -4402,10 +4402,13 @@
     if (times.length < 3) return false;
     const first = times[0], last = times[times.length - 1];
     if (last > dur + 5) return false;
-    if (last < Math.max(dur * 0.4, 10)) return false;
+    // La letra debe cubrir una parte sustancial de ESTA canción. Antes bastaba
+    // el 40 %, así que se colaba la versión de álbum (208 s) en un video de
+    // 312 s: la letra iba ~30 s adelantada y terminaba 107 s antes.
+    if (last < Math.max(dur * 0.70, 10)) return false;
     if (dur >= 90) {
       const span = last - first;
-      if (span < dur * 0.5) return false;
+      if (span < dur * 0.55) return false;
       // Intervalo mediano entre líneas: si están agolpadas (menos de ~0,3 s
       // entre línea y línea durante toda la letra), los tiempos no son reales.
       const gaps = [];
@@ -4660,9 +4663,11 @@
     if (t.offlineLyrics && t.offlineLyrics.type === 'synced') {
       // Un LRC auto-alineado por una versión anterior (o estimado por largo de
       // línea) NO debe impedir que se descargue una letra sincronizada real.
-      // Se guarda como respaldo y se intenta mejorar online.
+      // Además, si el .lrc local NO cubre la canción (p. ej. versión de álbum de
+      // 208 s en un video de 312 s), se descarta: la letra iría adelantada.
       const autoLocal = !!(t.offlineLyrics.voiceAligned || t.offlineLyrics.estimated);
-      if (autoLocal && !netBlocked()) {
+      const noCubre = !fitsDuration(t.offlineLyrics.lines, durSec(t));
+      if ((autoLocal || noCubre) && !netBlocked()) {
         t._autoLocal = t.offlineLyrics;
         t._lrcMala = t.offlineLyrics;
         t.offlineLyrics = null;
@@ -4671,7 +4676,9 @@
         t.lyrics = null;
         t.lyricState = null;
         t.lyricError = null;
-        dbg('lrc automático guardado: se busca una letra sincronizada real');
+        dbg(noCubre
+          ? 'lrc local no cubre la canción: se busca otra versión'
+          : 'lrc automático guardado: se busca una letra sincronizada real');
       }
     }
     if (t.offlineLyrics && t.offlineLyrics.type === 'synced') {
@@ -5903,13 +5910,18 @@
     const wordPct = wordsTotal ? Math.round(wordsInVoice * 100 / wordsTotal) : linePct;
 
     // Nota final: SOLO las líneas (las palabras las coloca el propio motor y
-    // darles peso haría la nota circular). Se resta por desfase global.
+    // darles peso haría la nota circular). Se resta por desfase global y se
+    // limita por la COBERTURA: una letra que termina 100 s antes no puede ser
+    // un 90 % solo porque sus líneas caen sobre frases vocales.
     let pct = linePct;
     const ad = Math.abs(offset);
     if (ad >= 1.2) pct = Math.max(0, pct - 15);
     else if (ad >= 0.6) pct = Math.max(0, pct - 8);
     else if (ad >= 0.35) pct = Math.max(0, pct - 3);
-    pct = Math.max(0, Math.min(100, pct));
+    const firstT = Math.min(...lines.map(l => +l.t));
+    const lastT = Math.max(...lines.map(l => +l.t));
+    const coverage = dur > 0 ? Math.max(0, Math.min(1, (lastT - firstT) / Math.max(1, dur - firstT))) : 1;
+    pct = Math.max(0, Math.min(100, Math.min(pct, Math.round(coverage * 100))));
 
     const verdict = pct < 60 ? 'bad'
       : (ad >= 0.5 || pct < 85) ? 'warn'
@@ -5922,6 +5934,7 @@
       linePct,
       wordPct,
       offset,
+      coverage,
       verdict,
       wordLines,
       wordsTotal,
@@ -6225,6 +6238,18 @@
     }
     if (!s || !isFinite(+s.pct)) return '';
     const pct = Math.max(0, Math.min(100, Math.round(+s.pct)));
+    // Cobertura baja = la letra es de otra versión (álbum/video) y va a ir
+    // adelantada o terminar antes. Se avisa en vez de dar un % engañoso.
+    if (isFinite(+s.coverage) && +s.coverage < 0.75) {
+      const cov = Math.round(+s.coverage * 100);
+      const det = [
+        'Esta letra solo cubre el ' + cov + ' % de la canción.',
+        'Puede ser de otra versión (álbum/video) o con un intro distinto.',
+        'Borra el .lrc de la canción y vuelve a descargar la letra.'
+      ];
+      return '<span class="ly-sync warn" title="' + esc(det.join(' · ')) + '">' +
+        '<i class="dot"></i>Letra de otra versión (' + cov + ' %)</span>';
+    }
     const off = Number(s.offset) || 0;
     const cls = s.verdict || syncVerdictFromPct(pct, off);
     let txt;
@@ -6963,7 +6988,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.7';
+  let APP_VERSION = '2.3.8';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
