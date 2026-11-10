@@ -2761,7 +2761,7 @@
     <div class="brand">
       <span class="logo"><svg class="ic" style="width:16px;height:16px"><use href="#i-music"/></svg></span>
       <span>Reproductor<small>Música, video y letras</small></span>
-      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.4</span>
+      <span class="verbadge" id="verBadge" title="Versión de la aplicación">v2.3.5</span>
     </div>
     <div class="spacer"></div>
     <button class="tool" id="btnAddFiles" title="Agregar archivos"><svg class="ic" style="width:15px;height:15px"><use href="#i-plus"/></svg> Archivos</button>
@@ -5828,31 +5828,32 @@
   // suficientes. Se guarda en la letra para no repetir el análisis.
   function voiceSyncInfo(L, A, dur) {
     if (!L || !Array.isArray(L.lines)) return null;
-    // Frases vocales con energía suficiente: las instrumentales sueltas no
-    // cuentan (el detector las marca con poca energía).
+    // Frases vocales detectadas. No se descartan las cortas: el motor Rust
+    // devuelve frases de 0.2–0.5 s y antes se filtraban por `eff >= 0.55`, lo
+    // que hacía que muchas líneas correctas contaran como fallo (70 % falsos).
     const phrases = (Array.isArray(A && A.phrases) ? A.phrases : [])
       .filter(p => p && isFinite(p.t) && isFinite(p.end) && p.end > p.t)
-      .filter(p => (p.eff === undefined || p.eff >= 0.55) || (p.end - p.t) >= 1.6)
+      .filter(p => (p.end - p.t) >= 0.15)
       .sort((a, b) => a.t - b.t);
     if (phrases.length < 4) return null;
     const lines = L.lines.filter(l => l && isFinite(+l.t) && +l.t >= 0 &&
       String(l.text || '').trim());
     if (lines.length < 5) return null;
 
-    // Acierto: la línea empieza dentro de una frase vocal (con un margen
-    // pequeño). En los huecos instrumentales largos no hay frase: esas líneas
-    // no cuentan como acierto, que es justo lo que queremos detectar.
+    // Acierto: la línea empieza dentro de una frase vocal (±0.5 s). Las frases
+    // ya vienen del detector de voz; no se descartan las cortas (el motor Rust
+    // produce frases de 0.2–0.5 s). Con el filtro antiguo (`eff >= 0.55`) se
+    // perdían frases reales y el porcentaje salía falso (70 %).
     let matched = 0;
     for (const l of lines) {
       const s = +l.t;
       if (phrases.some(p => s >= p.t - 0.5 && s <= p.end + 0.5)) matched++;
     }
-    const pct = Math.round(matched * 100 / lines.length);
+    const linePct = Math.round(matched * 100 / lines.length);
 
-    // Desfase global: se miran solo las líneas que abren frase (las que vienen
-    // tras un silencio en la letra) y se compara su inicio con el inicio de la
-    // frase vocal más cercana. Es más estable que emparejar todas las pausas y
-    // detecta adelantos/atrasos de medio segundo a dos segundos.
+    // Desfase global: líneas que abren frase (tras un silencio de la letra) vs
+    // inicio de la frase vocal más cercana. Un desfase constante real hace
+    // coincidir casi todos esos eventos.
     let offset = 0;
     const times = lines.map(l => +l.t);
     const ev = [];
@@ -5880,14 +5881,8 @@
       }
     }
 
-    const ad = Math.abs(offset);
-    const verdict = pct < 65 ? 'bad'
-      : (ad >= 0.4 || pct < 85) ? 'warn'
-      : 'ok';
-
-    // Analizador de sincronía de palabras y estilos de letra con la voz:
-    // comprueba cuántas líneas y palabras tienen tiempos anclados a ataques
-    // vocales reales para que los 16 estilos avancen con el cantante.
+    // Palabras ancladas a la voz (solo informativo; pesa poco en la nota porque
+    // las coloca el propio motor y sería circular darles mucho peso).
     let wordLines = 0, wordsTotal = 0, wordsInVoice = 0;
     for (const l of lines) {
       if (Array.isArray(l.words) && l.words.length > 1) {
@@ -5899,17 +5894,32 @@
         }
       }
     }
-    const wordPct = wordsTotal ? Math.round(wordsInVoice * 100 / wordsTotal) : pct;
+    const wordPct = wordsTotal ? Math.round(wordsInVoice * 100 / wordsTotal) : linePct;
+
+    // Nota final: SOLO las líneas (las palabras las coloca el propio motor y
+    // darles peso haría la nota circular). Se resta por desfase global.
+    let pct = linePct;
+    const ad = Math.abs(offset);
+    if (ad >= 1.2) pct = Math.max(0, pct - 15);
+    else if (ad >= 0.6) pct = Math.max(0, pct - 8);
+    else if (ad >= 0.35) pct = Math.max(0, pct - 3);
+    pct = Math.max(0, Math.min(100, pct));
+
+    const verdict = pct < 60 ? 'bad'
+      : (ad >= 0.5 || pct < 85) ? 'warn'
+      : 'ok';
 
     return {
       pct,
       total: lines.length,
       matched,
+      linePct,
+      wordPct,
       offset,
       verdict,
       wordLines,
       wordsTotal,
-      wordPct,
+      wordsInVoice,
       styleSynced: true
     };
   }
@@ -5918,7 +5928,7 @@
   function syncVerdictFromPct(pct, offset) {
     const p = Number(pct) || 0;
     const ad = Math.abs(Number(offset) || 0);
-    return p < 65 ? 'bad' : (ad >= 0.4 || p < 85) ? 'warn' : 'ok';
+    return p < 60 ? 'bad' : (ad >= 0.5 || p < 85) ? 'warn' : 'ok';
   }
 
   async function maybeAlignToVoice(t) {
@@ -6207,10 +6217,14 @@
     }
     const det = [];
     if (isFinite(+s.matched) && isFinite(+s.total)) {
-      det.push(+s.matched + ' de ' + +s.total + ' líneas empiezan junto a la voz (±0.5 s)');
+      det.push('Líneas alineadas con la voz: ' + (+s.matched) + ' de ' + (+s.total) +
+        ' (' + (+s.linePct || pct) + ' %)');
     }
     if (isFinite(+s.wordsTotal) && +s.wordsTotal > 0) {
-      det.push(+s.wordsTotal + ' palabras sincronizadas con ataques vocales (' + (+s.wordPct || pct) + ' % en voz)');
+      det.push('Palabras ancladas a ataques vocales: ' + (+s.wordPct || pct) + ' % de ' + (+s.wordsTotal));
+    }
+    if (isFinite(+s.linePct) && isFinite(+s.wordPct)) {
+      det.push('La nota se calcula solo con el inicio real de las líneas (sin contar las palabras ancladas por el propio motor)');
     }
     const curLyStyle2 = (document.body && document.body.dataset && document.body.dataset.ly) || 'minimal';
     det.push('Estilo «' + curLyStyle2 + '» sincronizado en tiempo real con la voz y la letra');
@@ -6930,7 +6944,7 @@
   $('btnFs').onclick = e => { e.stopPropagation(); toggleFs(); };
 
   /* ============ Conexión a internet ============ */
-  let APP_VERSION = '2.3.4';
+  let APP_VERSION = '2.3.5';
   try { $('verBadge').textContent = 'v' + APP_VERSION; } catch (e) {}
   // La versión real la manda el proceso principal (package.json). Así la
   // insignia nunca se queda en una versión vieja escrita a mano.
