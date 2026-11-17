@@ -4,9 +4,19 @@ Reproductor de música para Windows con sincronización automática de letras.
 
 ## Descarga
 
-[⬇️ Descargar última versión](https://github.com/isaac117q/reproductor-musica/releases/latest)
+[Descargar última versión](https://github.com/isaac117q/reproductor-musica/releases/latest) · [Página del proyecto](https://isaac117q.github.io/reproductor-musica/)
 
 El instalador está siempre en [Releases](https://github.com/isaac117q/reproductor-musica/releases/latest). Cuando exista una versión nueva, la app lo avisa y se actualiza con el botón **Actualizar** (las actualizaciones son manuales, no se instalan solas).
+
+## Capturas
+
+<p>
+  <img src="docs/landing-assets/app-letras.png" alt="Letras sincronizadas con la voz" width="100%">
+</p>
+<p>
+  <img src="docs/landing-assets/app-lista.png" alt="Lista de canciones y búsqueda" width="49%">
+  <img src="docs/landing-assets/app-voz.png" alt="Análisis de voz" width="49%">
+</p>
 
 ## Características
 
@@ -41,7 +51,6 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Conexión a internet (solo para la primera descarga de letras)
 
 ## Desarrollo
-
 
 
 ## Licencia
