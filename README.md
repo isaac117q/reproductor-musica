@@ -27,6 +27,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Indicador automático de sincronía con la voz: avisa si la letra va adelantada, atrasada o no coincide (solo informa, no cambia los tiempos)
 - Si la letra no venía sincronizada, el indicador muestra «Ajuste automático» en ámbar en vez de un porcentaje verde engañoso; primero se intenta descargar una letra sincronizada real
 - Verificación de letra correcta (idioma, artista, similitud)
+- Completa los tramos sin letra con reconocimiento de voz local (modelo opcional de 148 MB, se descarga una vez)
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
 - El botón Actualizar descarga solo la app (~4 MB) y, al pulsar «Instalar», la cierra, la sustituye y la reinicia sola (sin instalación del sistema)
