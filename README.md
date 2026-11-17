@@ -29,6 +29,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Verificación de letra correcta (idioma, artista, similitud)
 - Completa los tramos sin letra con reconocimiento de voz local (modelo opcional de 148 MB, se descarga una vez)
 - La letra espera a la voz: en un silencio instrumental no se adelanta; avanza cuando vuelve el canto
+- Ajuste manual por tramo: mueve ±0,1 s desde la línea activa y guarda el cambio
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
 - El botón Actualizar descarga solo la app (~4 MB) y, al pulsar «Instalar», la cierra, la sustituye y la reinicia sola (sin instalación del sistema)
