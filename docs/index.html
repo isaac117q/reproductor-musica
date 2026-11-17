@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reproductor de Música para Windows</title>
+<meta name="description" content="Reproductor de música para Windows con sincronización automática de letras. Busca la letra, la verifica y la ajusta a la voz.">
+<meta name="theme-color" content="#f7f6f2">
+<link rel="icon" href="icon.ico" type="image/x-icon">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Reproductor de Música para Windows">
+<meta property="og:description" content="Reproductor de música para Windows con sincronización automática de letras.">
+<meta property="og:image" content="landing-assets/app-letras.png">
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --panel: #ffffff;
+    --ink: #14160f;
+    --muted: #5b5f56;
+    --line: #dbd8ce;
+    --line-2: #c4c1b5;
+    --accent: #2f5d3a;
+    --accent-soft: #e9efe8;
+    --wrap: 1160px;
+    --r: 3px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  ul { list-style: none; }
+  .wrap { width: min(var(--wrap), calc(100% - 48px)); margin-inline: auto; }
+
+  .skip {
+    position: fixed; top: -100px; left: 12px; z-index: 100;
+    padding: 10px 16px; background: var(--ink); color: var(--bg);
+    font-weight: 600; border-radius: var(--r);
+  }
+  .skip:focus { top: 12px; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  h1, h2 {
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-weight: 400;
+    letter-spacing: -.02em;
+    line-height: 1.04;
+  }
+  h1 { font-size: clamp(44px, 5.4vw, 74px); }
+  h2 { font-size: clamp(30px, 3.4vw, 44px); }
+  p { color: var(--muted); }
+
+  /* Cabecera */
+  .head { border-bottom: 1px solid var(--line); }
+  .head-row { display: flex; align-items: center; gap: 34px; height: 76px; }
+  .brand {
+    display: inline-flex; align-items: baseline; gap: 10px;
+    font-family: Georgia, "Times New Roman", serif; font-size: 22px;
+    letter-spacing: -.02em; line-height: 1; white-space: nowrap;
+  }
+  .brand span { font-family: "Segoe UI", system-ui, sans-serif; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .nav { display: flex; gap: 26px; margin-left: auto; }
+  .nav a { font-size: 14px; color: var(--muted); padding: 4px 0; border-bottom: 1px solid transparent; }
+  .nav a:hover { color: var(--ink); border-color: var(--ink); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 46px; padding: 0 22px;
+    border-radius: var(--r); border: 1px solid transparent;
+    font-size: 14.5px; font-weight: 600; white-space: nowrap;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .btn-primary { background: var(--ink); color: var(--bg); }
+  .btn-primary:hover { background: var(--accent); }
+  .btn-secondary { border-color: var(--line-2); color: var(--ink); }
+  .btn-secondary:hover { border-color: var(--ink); }
+  .btn .ar { transition: transform .15s ease; }
+  .btn:hover .ar { transform: translateX(3px); }
+
+  /* Portada */
+  .hero { padding: clamp(44px, 6vw, 80px) 0 clamp(44px, 6vw, 72px); border-bottom: 1px solid var(--line); }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+  .hero h1 { margin-bottom: 18px; }
+  .hero .lead { font-size: 18px; line-height: 1.6; max-width: 46ch; margin-bottom: 26px; }
+  .hero-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
+  .meta { font-size: 12.5px; letter-spacing: .02em; color: var(--muted); }
+  .meta b { font-weight: 600; color: var(--ink); }
+  .shot { border: 1px solid var(--line-2); background: #0d0620; }
+  .shot img { width: 100%; height: auto; }
+
+  /* Secciones */
+  main > section { position: relative; }
+  .sec { padding: clamp(56px, 7vw, 92px) 0; border-bottom: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 36px; }
+  .sec-head h2 { max-width: 20ch; }
+  .kicker { font-size: 11.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  /* Características */
+  .features { display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; }
+  .feature { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 18px 0; border-top: 1px solid var(--line); }
+  .feature .n { font-size: 12px; font-weight: 700; color: var(--accent); padding-top: 3px; font-variant-numeric: tabular-nums; }
+  .feature p { font-size: 15px; line-height: 1.6; color: var(--ink); }
+
+  /* Capturas */
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .shots img { width: 100%; height: auto; border: 1px solid var(--line-2); }
+
+  /* Instalación */
+  .install { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(32px, 5vw, 76px); }
+  .install > * { min-width: 0; }
+  .steps { counter-reset: step; border-top: 1px solid var(--line); }
+  .steps li {
+    counter-increment: step;
+    display: grid; grid-template-columns: 34px 1fr; gap: 14px;
+    padding: 16px 0; border-bottom: 1px solid var(--line);
+    font-size: 15px; color: var(--ink);
+  }
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-size: 12px; font-weight: 700; color: var(--accent); padding-top: 3px;
+  }
+  .steps li span { overflow-wrap: anywhere; }
+  .req { border-top: 1px solid var(--line); }
+  .req li { padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 15px; color: var(--ink); }
+  .req li span { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .note { margin-top: 22px; font-size: 14px; line-height: 1.65; }
+
+  /* Cierre */
+  .close { background: var(--ink); color: var(--bg); padding: clamp(60px, 8vw, 100px) 0; }
+  .close .inner { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+  .close h2 { color: var(--bg); max-width: 18ch; }
+  .close p { color: rgba(247, 246, 242, .7); margin-top: 12px; font-size: 15px; }
+  .close .btn-primary { background: var(--bg); color: var(--ink); }
+  .close .btn-primary:hover { background: var(--accent); color: #fff; }
+
+  /* Pie */
+  footer { background: var(--ink); color: var(--bg); padding: 0 0 26px; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; padding-top: 26px; border-top: 1px solid rgba(255, 255, 255, .14); font-size: 12.5px; color: rgba(247, 246, 242, .55); }
+  .foot a { color: rgba(247, 246, 242, .78); }
+  .foot a:hover { color: #fff; }
+  .foot .links { display: flex; gap: 20px; }
+
+  @media (max-width: 900px) {
+    .head-row { height: auto; padding: 14px 0; flex-wrap: wrap; gap: 12px; }
+    .nav { display: none; }
+    .head .btn { margin-left: auto; }
+    .hero-grid { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; gap: 0; }
+    .shots { grid-template-columns: 1fr; }
+    .install { grid-template-columns: 1fr; }
+    .close .inner { align-items: flex-start; }
+  }
+
+  @media (max-width: 560px) {
+    .wrap { width: calc(100% - 36px); }
+    .brand span { display: none; }
+    .hero .lead { font-size: 16.5px; }
+    .hero-actions .btn { width: 100%; }
+    .foot { flex-direction: column; align-items: flex-start; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<header class="head">
+  <div class="wrap head-row">
+    <a class="brand" href="#inicio">Reproductor de Música <span>para Windows</span></a>
+    <nav class="nav" aria-label="Principal">
+      <a href="#caracteristicas">Características</a>
+      <a href="#capturas">Capturas</a>
+      <a href="#instalacion">Instalación</a>
+      <a href="#requisitos">Requisitos</a>
+    </nav>
+    <a class="btn btn-primary" href="https://github.com/isaac117q/reproductor-musica/releases/latest">Descargar</a>
+  </div>
+</header>
+
+<section class="hero" id="inicio">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>Reproductor de Música</h1>
+      <p class="lead">Reproductor de música para Windows con sincronización automática de letras.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/isaac117q/reproductor-musica/releases/latest">Descargar para Windows <span class="ar">→</span></a>
+        <a class="btn btn-secondary" href="https://github.com/isaac117q/reproductor-musica">Ver en GitHub</a>
+      </div>
+      <p class="meta">Windows 10 u 11 (x64) · <b>v2.4.7</b> · instalador y actualización ligera</p>
+    </div>
+    <figure class="shot">
+      <img src="landing-assets/app-letras.png" width="1600" height="950" alt="La app reproduciendo una canción con la letra sincronizada al lado">
+    </figure>
+  </div>
+</section>
+
+<main id="main">
+
+  <section class="sec" id="caracteristicas">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="kicker">Qué hace</p>
+          <h2>La letra se busca, se verifica y sigue a la voz</h2>
+        </div>
+      </div>
+      <div class="features">
+        <div class="feature"><span class="n">01</span><p>Reproducción de audio con letras sincronizadas.</p></div>
+        <div class="feature"><span class="n">02</span><p>Búsqueda automática de letras (lrclib, letras.com, lyrics.ovh).</p></div>
+        <div class="feature"><span class="n">03</span><p>Sincronización automática con la voz (análisis de audio).</p></div>
+        <div class="feature"><span class="n">04</span><p>Las letras LRC resaltan palabra por palabra siguiendo la voz del cantante, con relleno progresivo (efecto karaoke fluido).</p></div>
+        <div class="feature"><span class="n">05</span><p>Indicador automático de sincronía con la voz: avisa si la letra va adelantada, atrasada o no coincide (solo informa, no cambia los tiempos).</p></div>
+        <div class="feature"><span class="n">06</span><p>Si la letra no venía sincronizada, el indicador muestra «Ajuste automático» en ámbar en vez de un porcentaje verde engañoso; primero se intenta descargar una letra sincronizada real.</p></div>
+        <div class="feature"><span class="n">07</span><p>Verificación de letra correcta (idioma, artista, similitud).</p></div>
+        <div class="feature"><span class="n">08</span><p>Funciona sin internet (letras guardadas en caché + archivos .lrc).</p></div>
+        <div class="feature"><span class="n">09</span><p>Actualizaciones manuales desde el botón Actualizar.</p></div>
+        <div class="feature"><span class="n">10</span><p>El botón Actualizar descarga solo la app (~4 MB) y, al pulsar «Instalar», la cierra, la sustituye y la reinicia sola (sin instalación del sistema).</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="capturas">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="kicker">Capturas</p>
+          <h2>Lista y análisis de voz</h2>
+        </div>
+      </div>
+      <div class="shots">
+        <img src="landing-assets/app-lista.png" width="1600" height="950" alt="Lista de canciones con búsqueda por título o artista">
+        <img src="landing-assets/app-voz.png" width="1600" height="950" alt="Pestaña de voz con frases, ataques y precisión de la sincronía">
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="instalacion">
+    <div class="wrap install">
+      <div>
+        <p class="kicker">Instalación</p>
+        <h2>Cuatro pasos</h2>
+        <ol class="steps" style="margin-top:26px">
+          <li><span>Descarga el instalador desde Releases</span></li>
+          <li><span>Ejecuta el instalador</span></li>
+          <li><span>La app se instala en C:\Users\&lt;usuario&gt;\AppData\Local\Programs\reproductor-musica\</span></li>
+          <li><span>Cuando haya una versión nueva, usa el botón Actualizar de la app</span></li>
+        </ol>
+      </div>
+      <div id="requisitos">
+        <p class="kicker">Requisitos</p>
+        <h2>Lo que necesitas</h2>
+        <ul class="req" style="margin-top:26px">
+          <li><span>Sistema</span>Windows 10/11 (x64)</li>
+          <li><span>Conexión</span>Internet solo para la primera descarga de letras</li>
+        </ul>
+        <p class="note">Agrega canciones arrastrando archivos o con el botón Agregar. Las letras se buscan automáticamente al cargar cada pista, y la barra espaciadora reproduce o pausa.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="close" id="descargar">
+    <div class="wrap inner">
+      <div>
+        <h2>Descarga la última versión</h2>
+        <p>El instalador y las notas de cada versión están en GitHub.</p>
+      </div>
+      <a class="btn btn-primary" href="https://github.com/isaac117q/reproductor-musica/releases/latest">Ir a Releases <span class="ar">→</span></a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>Reproductor de Música · Windows 10/11 · MIT</span>
+    <div class="links">
+      <a href="https://github.com/isaac117q/reproductor-musica">GitHub</a>
+      <a href="https://github.com/isaac117q/reproductor-musica/releases/latest">Releases</a>
+      <a href="https://github.com/isaac117q/reproductor-musica/blob/main/README.md">README</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
