@@ -28,7 +28,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - Si la letra no venía sincronizada, el indicador muestra «Ajuste automático» en ámbar en vez de un porcentaje verde engañoso; primero se intenta descargar una letra sincronizada real
 - Verificación de letra correcta (idioma, artista, similitud)
 - Completa los tramos sin letra con reconocimiento de voz local (modelo opcional de 148 MB, se descarga una vez)
-- La letra espera a la voz: en un silencio instrumental no se adelanta; avanza cuando vuelve el canto
+- La letra espera a la voz: durante el intro instrumental no aparece ni se adelanta; surge cuando empieza el canto, y en los silencios se mantiene hasta que vuelve
 - Ajuste manual por tramo: mueve ±0,1 s desde la línea activa y guarda el cambio
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
