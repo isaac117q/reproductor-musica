@@ -31,6 +31,7 @@ El instalador está siempre en [Releases](https://github.com/isaac117q/reproduct
 - La letra espera a la voz: durante el intro instrumental no aparece ni se adelanta; surge cuando empieza el canto, y en los silencios se mantiene hasta que vuelve
 - Ajuste manual por tramo: mueve ±0,1 s desde la línea activa y guarda el cambio
 - Repara los `.lrc` con líneas fuera de orden (aviso «Letra reparada · revisar») y ofrece el desfase medido con un clic (`Ajustar ±X s`), sin mover la letra por su cuenta
+- Desfase de toda la canción: −0,5 / −0,1 / +0,1 / +0,5 s con el valor a la vista y reinicio a 0; se guarda por pista
 - Funciona sin internet (letras guardadas en caché + archivos .lrc)
 - Actualizaciones manuales desde el botón Actualizar
 - El botón Actualizar descarga solo la app (~4 MB) y, al pulsar «Instalar», la cierra, la sustituye y la reinicia sola (sin instalación del sistema)
